@@ -9,8 +9,9 @@ import time
 import pygame
 import websockets
 import logging
-from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QMainWindow
-from PyQt5.QtWidgets import QAction, QInputDialog, QLineEdit
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QSizePolicy
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGroupBox
+from PyQt5.QtWidgets import QAction, QInputDialog, QLineEdit, QLabel, QPushButton, QTextEdit
 from PyQt5.QtCore import QEvent, Qt
 import sys
 import keyboard
@@ -33,10 +34,11 @@ class MainWindow(QMainWindow):
         self.micros_controller = MicrosController(self.loop)
         if not self.micros_controller.thread_server or not self.micros_controller.thread_server.is_alive():
             self.micros_controller.thread_server.start()
-        time.sleep(3)
+        time.sleep(2.0)
         print("server started")
         # self.micros_controller.coord_check()
         self.continuous_mode = True
+        self.closed = False
         self.key_shift_pressed = False
         self.keyboard_buttons = {Qt.Key_Up: KeyboardButton(), Qt.Key_Right: KeyboardButton(),
                                  Qt.Key_Down: KeyboardButton(), Qt.Key_Left: KeyboardButton(),
@@ -44,12 +46,23 @@ class MainWindow(QMainWindow):
         self.thread_continuous = Thread(target=self.continuous_move)
         self.thread_continuous.start()
 
+        # Доступные для взаимодействия компоненты формы
+        self.img_label = QLabel()
+        self.coord_label = QLabel("Текущие координаты:")
+        self.init_btn = QPushButton("Инициализация")
+        self.move_btn = QPushButton("Двигать в ...")
+        self.manual_btn = QPushButton("Ручной режим")
+        self.x1_edt = QTextEdit()
+        self.y1_edt = QTextEdit()
+        self.x2_edt = QTextEdit()
+        self.y2_edt = QTextEdit()
+        self.border_btn = QPushButton("Определить границы")
+        self.scan_btn = QPushButton("Новое сканирование")
+
         self.init_ui()
 
     # Создание элементов формы
     def init_ui(self):
-        main_widget = QWidget(self)
-        central_layout = QHBoxLayout()
 
         # keyboard.add_hotkey("Ctrl + 1", lambda: print("Left"))
 
@@ -87,8 +100,25 @@ class MainWindow(QMainWindow):
         device_menu.addAction(device_menu_action_exit)
         menu_bar.addMenu(device_menu)
 
+        # установка центрального виджета и лайаута
+        main_widget = QWidget(self)
+        central_layout = QHBoxLayout()
         main_widget.setLayout(central_layout)
         self.setCentralWidget(main_widget)
+
+        # левый лайаут с изображением
+        left_layout = QVBoxLayout()
+        central_layout.addLayout(left_layout)
+        self.img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.img_label.setStyleSheet("border: 1px solid red")
+        left_layout.addWidget(self.img_label)
+
+        # правый лайаут с панелью
+        right_layout = QVBoxLayout()
+        central_layout.addLayout(right_layout)
+        right_layout.addWidget(self.coord_label)
+        right_layout.addWidget(self.init_btn)
+        right_layout.addWidget(self.move_btn)
 
         self.installEventFilter(self)
 
@@ -97,6 +127,9 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 600)
 
         self.show()
+
+    def closeEvent(self, event):
+        self.closed = True
 
     def device_init(self):
         self.micros_controller.coord_init()
@@ -165,7 +198,7 @@ class MainWindow(QMainWindow):
         return QMainWindow.eventFilter(self, obj, event)
 
     def continuous_move(self):
-        while True:
+        while not self.closed:
             if self.continuous_mode:
                 # someone_clicked = False
                 steps_count = 24
