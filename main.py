@@ -10,13 +10,15 @@ import pygame
 import websockets
 import logging
 from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QSizePolicy
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGroupBox
-from PyQt5.QtWidgets import QAction, QInputDialog, QLineEdit, QLabel, QPushButton, QTextEdit
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout
+from PyQt5.QtWidgets import QAction, QInputDialog, QLineEdit, QLabel, QPushButton, QTextEdit, QFormLayout
 from PyQt5.QtCore import QEvent, Qt
 import sys
 import keyboard
 import datetime
 import os
+
+from PyQt5 import QtGui
 from vassal import Terminal
 from threading import Thread
 import json
@@ -37,7 +39,7 @@ class MainWindow(QMainWindow):
         time.sleep(2.0)
         print("server started")
         # self.micros_controller.coord_check()
-        self.continuous_mode = True
+        self.continuous_mode = False
         self.closed = False
         self.key_shift_pressed = False
         self.keyboard_buttons = {Qt.Key_Up: KeyboardButton(), Qt.Key_Right: KeyboardButton(),
@@ -47,17 +49,17 @@ class MainWindow(QMainWindow):
         self.thread_continuous.start()
 
         # Доступные для взаимодействия компоненты формы
-        self.img_label = QLabel()
-        self.coord_label = QLabel("Текущие координаты:")
-        self.init_btn = QPushButton("Инициализация")
-        self.move_btn = QPushButton("Двигать в ...")
-        self.manual_btn = QPushButton("Ручной режим")
-        self.x1_edt = QTextEdit()
-        self.y1_edt = QTextEdit()
-        self.x2_edt = QTextEdit()
-        self.y2_edt = QTextEdit()
-        self.border_btn = QPushButton("Определить границы")
-        self.scan_btn = QPushButton("Новое сканирование")
+        self.lbl_img = QLabel()
+        self.lbl_coord = QLabel("Текущие координаты:")
+        self.btn_init = QPushButton("Инициализация")
+        self.btn_move = QPushButton("Двигать в ...")
+        self.btn_manual = QPushButton("Ручной режим")
+        self.edt_border_x1 = QTextEdit()
+        self.edt_border_y1 = QTextEdit()
+        self.edt_border_x2 = QTextEdit()
+        self.edt_border_y2 = QTextEdit()
+        self.btn_border = QPushButton("Определить границы")
+        self.btn_scan = QPushButton("Новая съемка")
 
         self.init_ui()
 
@@ -109,16 +111,55 @@ class MainWindow(QMainWindow):
         # левый лайаут с изображением
         left_layout = QVBoxLayout()
         central_layout.addLayout(left_layout)
-        self.img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.img_label.setStyleSheet("border: 1px solid red")
-        left_layout.addWidget(self.img_label)
+        self.lbl_img.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.lbl_img.setStyleSheet("border: 1px solid red")
+        left_layout.addWidget(self.lbl_img)
 
         # правый лайаут с панелью
         right_layout = QVBoxLayout()
         central_layout.addLayout(right_layout)
-        right_layout.addWidget(self.coord_label)
-        right_layout.addWidget(self.init_btn)
-        right_layout.addWidget(self.move_btn)
+        right_layout.addWidget(self.lbl_coord)
+        self.btn_init.clicked.connect(self.device_init)
+        right_layout.addWidget(self.btn_init)
+        self.btn_move.clicked.connect(self.device_move)
+        right_layout.addWidget(self.btn_move)
+        self.btn_manual.setCheckable(True)
+        self.btn_manual.setChecked(False)
+        self.btn_manual.toggled["bool"].connect(self.device_manual)
+        right_layout.addWidget(self.btn_manual)
+
+        # self.edt_border_x1.setLineWrapMode(QTextEdit_LineWrapMode=QTextEdit.NoWrap)
+        border_layout = QVBoxLayout()
+        right_layout.addStretch()
+        right_layout.addLayout(border_layout)
+        border_layout.addWidget(QLabel("Границы съемки:"))
+        # border_form_layout = QGridLayout()
+        border_form_layout = QFormLayout()
+        # self.edt_border_x1.setWordWrapMode(QtGui.QTextOption.NoWrap)
+        self.edt_border_x1.setMaximumHeight(30)
+        self.edt_border_y1.setMaximumHeight(30)
+        self.edt_border_x2.setMaximumHeight(30)
+        self.edt_border_y2.setMaximumHeight(30)
+
+        border_form_layout.addRow(QLabel("x1"), self.edt_border_x1)
+        border_form_layout.addRow(QLabel("y1"), self.edt_border_y1)
+        border_form_layout.addRow(QLabel("x2"), self.edt_border_x2)
+        border_form_layout.addRow(QLabel("y2"), self.edt_border_y2)
+        border_form_layout.setSpacing(0)
+        # border_form_layout.setSpacing(2)
+        # border_form_layout.addWidget(QLabel("x1"), 0, 0)
+        # border_form_layout.addWidget(self.edt_border_x1, 1, 0)
+        # border_form_layout.addWidget(QLabel("y1"), 2, 0)
+        # border_form_layout.addWidget(self.edt_border_y1, 3, 0)
+        # border_form_layout.addWidget(QLabel("x2"), 0, 1)
+        # border_form_layout.addWidget(self.edt_border_x2, 1, 1)
+        # border_form_layout.addWidget(QLabel("y2"), 2, 1)
+        # border_form_layout.addWidget(self.edt_border_y2, 3, 1)
+
+        border_layout.addLayout(border_form_layout)
+
+        right_layout.addWidget(self.btn_border)
+        right_layout.addWidget(self.btn_scan)
 
         self.installEventFilter(self)
 
@@ -153,6 +194,16 @@ class MainWindow(QMainWindow):
             coord = [80 * int(item) for item in text.split(';')]
             self.micros_controller.coord_move(coord)
             self.setWindowTitle(str(self.micros_controller))
+
+    def device_manual(self, status):
+        self.continuous_mode = status
+        self.control_elements_enabled(not status)
+
+    def control_elements_enabled(self, status):
+        self.btn_init.setEnabled(status)
+        self.btn_move.setEnabled(status)
+        self.btn_border.setEnabled(status)
+        self.btn_scan.setEnabled(status)
 
     # Тестовая функция для рисования круга и спирали
     def test_circle(self):
@@ -366,8 +417,6 @@ class MicrosController:
 
     def init(self):
         return self.send_json_request("init request")
-
-
 
     # функция отправки json для управления станком
     @staticmethod
