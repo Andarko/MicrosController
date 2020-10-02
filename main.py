@@ -9,6 +9,8 @@ import time
 import pygame
 import websockets
 import logging
+
+from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QSizePolicy
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout
 from PyQt5.QtWidgets import QAction, QInputDialog, QLineEdit, QLabel, QPushButton, QTextEdit, QFormLayout
@@ -17,6 +19,9 @@ import sys
 import keyboard
 import datetime
 import os
+import numpy as np
+import cv2
+
 
 from PyQt5 import QtGui
 from vassal import Terminal
@@ -31,20 +36,25 @@ class MainWindow(QMainWindow):
     # Инициализация
     def __init__(self):
         super().__init__()
-        # self.micros_controller = MicrosController('localhost', 5001)
+
+        # self.micros_controller = TableController('localhost', 5001)
         self.loop = asyncio.get_event_loop()
-        self.micros_controller = MicrosController(self.loop)
-        if not self.micros_controller.thread_server or not self.micros_controller.thread_server.is_alive():
-            self.micros_controller.thread_server.start()
+        self.table_controller = TableController(self.loop)
+        self.micros_controller = MicrosController()
+        if not self.table_controller.thread_server or not self.table_controller.thread_server.is_alive():
+            self.table_controller.thread_server.start()
         time.sleep(2.0)
         print("server started")
         # self.micros_controller.coord_check()
         self.continuous_mode = False
         self.closed = False
         self.key_shift_pressed = False
-        self.keyboard_buttons = {Qt.Key_Up: KeyboardButton(), Qt.Key_Right: KeyboardButton(),
-                                 Qt.Key_Down: KeyboardButton(), Qt.Key_Left: KeyboardButton(),
-                                 Qt.Key_Plus: KeyboardButton(), Qt.Key_Minus: KeyboardButton() }
+        # self.keyboard_buttons = {Qt.Key_Up: KeyboardButton(), Qt.Key_Right: KeyboardButton(),
+        #                          Qt.Key_Down: KeyboardButton(), Qt.Key_Left: KeyboardButton(),
+        #                          Qt.Key_Plus: KeyboardButton(), Qt.Key_Minus: KeyboardButton()}
+        self.keyboard_buttons = {Qt.Key_W: KeyboardButton(), Qt.Key_D: KeyboardButton(),
+                                 Qt.Key_S: KeyboardButton(), Qt.Key_A: KeyboardButton(),
+                                 Qt.Key_Plus: KeyboardButton(), Qt.Key_Minus: KeyboardButton()}
         self.thread_continuous = Thread(target=self.continuous_move)
         self.thread_continuous.start()
 
@@ -140,6 +150,10 @@ class MainWindow(QMainWindow):
         self.edt_border_y1.setMaximumHeight(30)
         self.edt_border_x2.setMaximumHeight(30)
         self.edt_border_y2.setMaximumHeight(30)
+        self.edt_border_x1.setEnabled(False)
+        self.edt_border_y1.setEnabled(False)
+        self.edt_border_x2.setEnabled(False)
+        self.edt_border_y2.setEnabled(False)
 
         border_form_layout.addRow(QLabel("x1"), self.edt_border_x1)
         border_form_layout.addRow(QLabel("y1"), self.edt_border_y1)
@@ -173,12 +187,12 @@ class MainWindow(QMainWindow):
         self.closed = True
 
     def device_init(self):
-        self.micros_controller.coord_init()
-        self.setWindowTitle(str(self.micros_controller))
+        self.table_controller.coord_init()
+        self.setWindowTitle(str(self.table_controller))
 
     def device_check(self):
-        self.micros_controller.coord_check()
-        self.setWindowTitle(str(self.micros_controller))
+        self.table_controller.coord_check()
+        self.setWindowTitle(str(self.table_controller))
 
     def device_move(self):
         input_dialog = QInputDialog()
@@ -186,14 +200,14 @@ class MainWindow(QMainWindow):
                                         "Введите дистанцию в миллиметрах",
                                         "Дистанция:",
                                         QLineEdit.Normal,
-                                        str(int(self.micros_controller.coord[0] / 80)) + ';'
-                                        + str(int(self.micros_controller.coord[1] / 80)) + ';'
-                                        + str(int(self.micros_controller.coord[2] / 80)))
+                                        str(int(self.table_controller.coord[0] / 80)) + ';'
+                                        + str(int(self.table_controller.coord[1] / 80)) + ';'
+                                        + str(int(self.table_controller.coord[2] / 80)))
 
         if ok:
             coord = [80 * int(item) for item in text.split(';')]
-            self.micros_controller.coord_move(coord)
-            self.setWindowTitle(str(self.micros_controller))
+            self.table_controller.coord_move(coord)
+            self.setWindowTitle(str(self.table_controller))
 
     def device_manual(self, status):
         self.continuous_mode = status
@@ -207,7 +221,7 @@ class MainWindow(QMainWindow):
 
     # Тестовая функция для рисования круга и спирали
     def test_circle(self):
-        self.micros_controller.coord_check()
+        self.table_controller.coord_check()
         count = 200
         r = 0.0
         # r = 20
@@ -216,7 +230,7 @@ class MainWindow(QMainWindow):
             alfa = (i / count) * 2 * math.pi
             dx = int(r * math.sin(alfa))
             dy = int(r * math.cos(alfa))
-            self.micros_controller.coord_move([dx, dy, 0], mode='continuous')
+            self.table_controller.coord_move([dx, dy, 0], mode='continuous')
 
             # self.micros_controller.coord_move([self.micros_controller.coord[0] + dx,
             #                                    self.micros_controller.coord[1] + dy,
@@ -237,16 +251,21 @@ class MainWindow(QMainWindow):
     # Обработчики событий формы и ее компонентов
     def eventFilter(self, obj, event):
         if event.type() == QEvent.KeyPress:
+            # print("Press " + str(event.key()))
             if event.key() == Qt.Key_Shift:
                 self.key_shift_pressed = True
             elif event.key() in self.keyboard_buttons:
                 self.keyboard_buttons[event.key()].key_press()
         elif event.type() == QEvent.KeyRelease:
+            # print("Release " + str(event.key()))
             if event.key() in self.keyboard_buttons:
                 self.keyboard_buttons[event.key()].key_release()
             elif event.key() == Qt.Key_Shift:
                 self.key_shift_pressed = False
         return QMainWindow.eventFilter(self, obj, event)
+
+    # def keyPressEvent(self, event):
+    #     print(event.key())
 
     def continuous_move(self):
         while not self.closed:
@@ -255,27 +274,60 @@ class MainWindow(QMainWindow):
                 steps_count = 24
                 if self.key_shift_pressed:
                     steps_count = 8
-                if self.keyboard_buttons[Qt.Key_Up].check_click():
-                    self.micros_controller.coord_move([0, steps_count, 0], mode="continuous")
+                if self.keyboard_buttons[Qt.Key_W].check_click():
+                    self.table_controller.coord_move([0, steps_count, 0], mode="continuous")
                     # someone_clicked = True
-                if self.keyboard_buttons[Qt.Key_Right].check_click():
-                    self.micros_controller.coord_move([steps_count, 0, 0], mode="continuous")
+                if self.keyboard_buttons[Qt.Key_D].check_click():
+                    self.table_controller.coord_move([steps_count, 0, 0], mode="continuous")
                     # someone_clicked = True
-                if self.keyboard_buttons[Qt.Key_Down].check_click():
-                    self.micros_controller.coord_move([0, -steps_count, 0], mode="continuous")
+                if self.keyboard_buttons[Qt.Key_S].check_click():
+                    self.table_controller.coord_move([0, -steps_count, 0], mode="continuous")
                     # someone_clicked = True
-                if self.keyboard_buttons[Qt.Key_Left].check_click():
-                    self.micros_controller.coord_move([-steps_count, 0, 0], mode="continuous")
+                if self.keyboard_buttons[Qt.Key_A].check_click():
+                    self.table_controller.coord_move([-steps_count, 0, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_Plus].check_click():
-                    self.micros_controller.coord_move([0, 0, steps_count], mode="continuous")
+                    self.table_controller.coord_move([0, 0, steps_count], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_Minus].check_click():
-                    self.micros_controller.coord_move([0, 0, -steps_count], mode="continuous")
+                    self.table_controller.coord_move([0, 0, -steps_count], mode="continuous")
                     # someone_clicked = True
                 # if someone_clicked:
                 time.sleep(0.001)
 
+    @staticmethod
+    def numpy_to_q_image(image):
+        q_img = QImage()
+        if image.dtype == np.uint8:
+            if len(image.shape) == 2:
+                channels = 1
+                height, width = image.shape
+                bytes_per_line = channels * width
+                q_img = QImage(
+                    image.data, width, height, bytes_per_line, QImage.Format_Indexed8
+                )
+                q_img.setColorTable([QtGui.qRgb(i, i, i) for i in range(256)])
+            elif len(image.shape) == 3:
+                if image.shape[2] == 3:
+                    height, width, channels = image.shape
+                    bytes_per_line = channels * width
+                    q_img = QImage(
+                        image.data, width, height, bytes_per_line, QImage.Format_RGB888
+                    )
+                elif image.shape[2] == 4:
+                    height, width, channels = image.shape
+                    bytes_per_line = channels * width
+                    fmt = QImage.Format_ARGB32
+                    q_img = QImage(
+                        image.data, width, height, bytes_per_line, QImage.Format_ARGB32
+                    )
+        return q_img
+
+    def set_new_view(self):
+        main_img = self.micros_controller.test_img HERE HERE HERE
+        q_img = self.numpy_to_q_image(main_img)
+        pixmap = QtGui.QPixmap.fromImage(q_img)
+        self.lbl_img.setPixmap(pixmap)
 
 # Класс-помощник для отслеживания ручного управления установкой клавишами
 class KeyboardButton:
@@ -291,13 +343,13 @@ class KeyboardButton:
     def key_press(self):
         self.clicked = True
         self.released = False
-        print(self.clicked)
+        # print(self.clicked)
 
     # Получен сигнал отпуска
     def key_release(self):
         self.released = True
         self.time_released = time.time()
-        print(self.clicked)
+        # print(self.clicked)
 
     # Проверка - нажата ли кнопка и обработка таймера
     def check_click(self):
@@ -315,11 +367,21 @@ class KeyboardButton:
         return self.clicked
 
 
+# Класс управления микроскопом (пока тестовая подделка)
+class MicrosController:
+    def __init__(self):
+        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard.jpg"
+        self.test_img = cv2.imread(self.test_img_path)[:, :, ::-1]
+
+    def shoot(self):
+        pass
+
+
 # Класс, который общается с контроллером станка
 # 1. Проверяет наличие сервера
 # 2. Запускает сервер на Raspberry pi
 # 3. Управляет движениями станка
-class MicrosController:
+class TableController:
     def __init__(self, loop, hostname="192.168.42.100", port=8080):
         # Параметры подключения к серверу raspberry pi
         self.hostname = hostname
@@ -423,11 +485,6 @@ class MicrosController:
     def send_json_request(json_request):
         answer = "ok"
         return answer
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
 
 
 # Press the green button in the gutter to run the script.
