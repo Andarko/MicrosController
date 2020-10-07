@@ -29,6 +29,7 @@ from threading import Thread
 import json
 import math
 from pynput.keyboard import Key, Listener
+from settings_dialog import SettingsDialog, ProgramSettings
 
 
 # Класс главного окна
@@ -41,6 +42,7 @@ class MainWindow(QMainWindow):
         self.loop = asyncio.get_event_loop()
         self.table_controller = TableController(self.loop)
         self.micros_controller = MicrosController()
+
         if not self.table_controller.thread_server or not self.table_controller.thread_server.is_alive():
             self.table_controller.thread_server.start()
         time.sleep(2.0)
@@ -71,7 +73,12 @@ class MainWindow(QMainWindow):
         self.btn_border = QPushButton("Определить границы")
         self.btn_scan = QPushButton("Новая съемка")
 
+        self.programSettings = ProgramSettings()
+
         self.init_ui()
+
+        shoot = self.micros_controller.shoot(1500, 2500, 2500, 3500)
+        self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
 
     # Создание элементов формы
     def init_ui(self):
@@ -80,7 +87,7 @@ class MainWindow(QMainWindow):
 
         # Основное меню
         menu_bar = self.menuBar()
-        # Меню "Файл"
+        # Меню "Станок"
         device_menu = menu_bar.addMenu("&Станок")
         device_menu_action_init = QAction("&Инициализация", self)
         device_menu_action_init.setShortcut("Ctrl+N")
@@ -111,6 +118,13 @@ class MainWindow(QMainWindow):
         device_menu_action_exit.triggered.connect(self.close)
         device_menu.addAction(device_menu_action_exit)
         menu_bar.addMenu(device_menu)
+
+        # Меню "Настройки"
+        services_menu = menu_bar.addMenu("&Сервис")
+        services_menu_action_settings = QAction("&Настройки", self)
+        services_menu_action_settings.triggered.connect(self.services_menu_action_settings_click)
+        services_menu.addAction(services_menu_action_settings)
+        menu_bar.addMenu(services_menu)
 
         # установка центрального виджета и лайаута
         main_widget = QWidget(self)
@@ -173,7 +187,9 @@ class MainWindow(QMainWindow):
         border_layout.addLayout(border_form_layout)
 
         right_layout.addWidget(self.btn_border)
+        self.btn_border.clicked.connect(self.border_find)
         right_layout.addWidget(self.btn_scan)
+        self.btn_scan.clicked.connect(self.scan)
 
         self.installEventFilter(self)
 
@@ -186,28 +202,39 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.closed = True
 
+    @staticmethod
+    def services_menu_action_settings_click(self):
+        settings_dialog = SettingsDialog()
+        settings_dialog.setAttribute(Qt.WA_DeleteOnClose)
+        settings_dialog.exec()
+
     def device_init(self):
+        self.control_elements_enabled(False)
         self.table_controller.coord_init()
         self.setWindowTitle(str(self.table_controller))
+        self.control_elements_enabled(True)
 
     def device_check(self):
         self.table_controller.coord_check()
         self.setWindowTitle(str(self.table_controller))
 
     def device_move(self):
+        self.control_elements_enabled(False)
         input_dialog = QInputDialog()
         text, ok = input_dialog.getText(self,
                                         "Введите дистанцию в миллиметрах",
                                         "Дистанция:",
                                         QLineEdit.Normal,
-                                        str(int(self.table_controller.coord[0] / 80)) + ';'
-                                        + str(int(self.table_controller.coord[1] / 80)) + ';'
-                                        + str(int(self.table_controller.coord[2] / 80)))
+                                        str(int(self.table_controller.coord_mm[0])) + ';'
+                                        + str(int(self.table_controller.coord_mm[1])) + ';'
+                                        + str(int(self.table_controller.coord_mm[2])))
 
         if ok:
-            coord = [80 * int(item) for item in text.split(';')]
+            coord = [int(item) for item in text.split(';')]
             self.table_controller.coord_move(coord)
             self.setWindowTitle(str(self.table_controller))
+
+        self.control_elements_enabled(True)
 
     def device_manual(self, status):
         self.continuous_mode = status
@@ -248,6 +275,44 @@ class MainWindow(QMainWindow):
         #     for i in range(100):
         #         self.micros_controller.coord_move([0, -d_steps, 0], mode='continuous')
 
+    def border_find(self):
+        self.control_elements_enabled(False)
+        search_step = 5
+        try:
+            # if self.table_controller.server_status == 'uninit':
+            #     self.table_controller.coord_init()
+            # Перевод камеры к позиции, где должна располагаться микросхема
+            middle = list()
+            middle.append(int(self.table_controller.limits[0] / 2))
+            middle.append(int(self.table_controller.limits[1] / 2))
+            middle.append(self.programSettings.shoot_height)
+            # self.table_controller.coord_move(middle, mode="discret")
+            x = self.table_controller.coord_mm[0]
+            y = self.table_controller.coord_mm[1]
+            pixels_in_mm = 10
+            shoot = self.micros_controller.shoot(pixels_in_mm * (x - 10), pixels_in_mm * (y - 5),
+                                                 pixels_in_mm * (x + 10), pixels_in_mm * (y + 5))
+            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+            # Направления для поиска краев
+            direction_sequence = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]]
+            for direction in direction_sequence:
+                next_frame = True
+                while next_frame:
+                    x += 20 * direction[0]
+                    y += 10 * direction[0]
+                    shoot = self.micros_controller.shoot(x - 100, y - 50, x + 100, y + 50)
+                    self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+
+        finally:
+            self.control_elements_enabled(True)
+
+    # Вспомогательная функция для определения - достигла ли камера границы при поиске
+    def check_border_in_image(self, img, direction):
+        pass
+
+    def scan(self):
+        pass
+
     # Обработчики событий формы и ее компонентов
     def eventFilter(self, obj, event):
         if event.type() == QEvent.KeyPress:
@@ -278,13 +343,13 @@ class MainWindow(QMainWindow):
                     self.table_controller.coord_move([0, steps_count, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_D].check_click():
-                    self.table_controller.coord_move([steps_count, 0, 0], mode="continuous")
+                    self.table_controller.coord_move([-steps_count, 0, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_S].check_click():
                     self.table_controller.coord_move([0, -steps_count, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_A].check_click():
-                    self.table_controller.coord_move([-steps_count, 0, 0], mode="continuous")
+                    self.table_controller.coord_move([steps_count, 0, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_Plus].check_click():
                     self.table_controller.coord_move([0, 0, steps_count], mode="continuous")
@@ -295,39 +360,6 @@ class MainWindow(QMainWindow):
                 # if someone_clicked:
                 time.sleep(0.001)
 
-    @staticmethod
-    def numpy_to_q_image(image):
-        q_img = QImage()
-        if image.dtype == np.uint8:
-            if len(image.shape) == 2:
-                channels = 1
-                height, width = image.shape
-                bytes_per_line = channels * width
-                q_img = QImage(
-                    image.data, width, height, bytes_per_line, QImage.Format_Indexed8
-                )
-                q_img.setColorTable([QtGui.qRgb(i, i, i) for i in range(256)])
-            elif len(image.shape) == 3:
-                if image.shape[2] == 3:
-                    height, width, channels = image.shape
-                    bytes_per_line = channels * width
-                    q_img = QImage(
-                        image.data, width, height, bytes_per_line, QImage.Format_RGB888
-                    )
-                elif image.shape[2] == 4:
-                    height, width, channels = image.shape
-                    bytes_per_line = channels * width
-                    fmt = QImage.Format_ARGB32
-                    q_img = QImage(
-                        image.data, width, height, bytes_per_line, QImage.Format_ARGB32
-                    )
-        return q_img
-
-    def set_new_view(self):
-        main_img = self.micros_controller.test_img HERE HERE HERE
-        q_img = self.numpy_to_q_image(main_img)
-        pixmap = QtGui.QPixmap.fromImage(q_img)
-        self.lbl_img.setPixmap(pixmap)
 
 # Класс-помощник для отслеживания ручного управления установкой клавишами
 class KeyboardButton:
@@ -373,8 +405,42 @@ class MicrosController:
         self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard.jpg"
         self.test_img = cv2.imread(self.test_img_path)[:, :, ::-1]
 
-    def shoot(self):
-        pass
+    @staticmethod
+    def numpy_to_q_image(image):
+        q_img = QImage()
+        if image.dtype == np.uint8:
+            if len(image.shape) == 2:
+                channels = 1
+                height, width = image.shape
+                bytes_per_line = channels * width
+                q_img = QImage(
+                    image.data, width, height, bytes_per_line, QImage.Format_Indexed8
+                )
+                q_img.setColorTable([QtGui.qRgb(i, i, i) for i in range(256)])
+            elif len(image.shape) == 3:
+                if image.shape[2] == 3:
+                    height, width, channels = image.shape
+                    bytes_per_line = channels * width
+                    q_img = QImage(
+                        image.data, width, height, bytes_per_line, QImage.Format_RGB888
+                    )
+                elif image.shape[2] == 4:
+                    height, width, channels = image.shape
+                    bytes_per_line = channels * width
+                    fmt = QImage.Format_ARGB32
+                    q_img = QImage(
+                        image.data, width, height, bytes_per_line, QImage.Format_ARGB32
+                    )
+        return q_img
+
+    def numpy_to_pixmap(self, img):
+        q_img = self.numpy_to_q_image(img)
+        pixmap = QtGui.QPixmap.fromImage(q_img)
+        return pixmap
+
+    def shoot(self, x1: int, y1: int, x2: int, y2: int):
+        time.sleep(0.5)
+        return np.copy(self.test_img[y1:y2, x1:x2, :])
 
 
 # Класс, который общается с контроллером станка
@@ -390,15 +456,19 @@ class TableController:
         self.server_status = 'uninit'
         # Текущий статус станка: работает или нет
         self.operation_status = ''
-        self.coord = [-1, -1, -1]
+        self.coord_step = [-1, -1, -1]
+        self.coord_mm = [-1, -1, -1]
         self.manual_mode = True
         self.manual_left_count = 0
         self.manual_right_count = 0
         self.loop = loop
         self.thread_server = Thread(target=self.server_start)
 
+        self.limits = (340, 640, 70)
+        self.steps_in_mm = 80
+
     def __repr__(self):
-        return "coord = " + str(self.coord) + "; server status = " + self.server_status \
+        return "coord = " + str(self.coord_mm) + "; server status = " + self.server_status \
                + "; last op status = " + self.operation_status
 
     async def consumer(self):
@@ -432,7 +502,10 @@ class TableController:
 
     def result_unpack(self, result):
         result_str = json.loads(result)
-        self.coord = [result_str['x'], result_str['y'], result_str['z']]
+        self.coord_step = [result_str['x'], result_str['y'], result_str['z']]
+        self.coord_mm = [int(result_str['x'] / self.steps_in_mm),
+                         int(result_str['y'] / self.steps_in_mm),
+                         int(result_str['z'] / self.steps_in_mm)]
         self.operation_status = result_str['status']
         self.server_status = result_str['status']
 
@@ -448,11 +521,14 @@ class TableController:
         result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
         self.result_unpack(result)
 
+    # Команда движения установки
     def coord_move(self, coord, mode="discret"):
-        if mode == "discret" and min(self.coord) >= 0:
-            dx = coord[0] - self.coord[0]
-            dy = coord[1] - self.coord[1]
-            dz = coord[2] - self.coord[2]
+        # В режиме точечного перемещения надо передавать миллиметры
+        if mode == "discret" and min(self.coord_step) >= 0:
+            dx = coord[0] * self.steps_in_mm - self.coord_step[0]
+            dy = coord[1] * self.steps_in_mm - self.coord_step[1]
+            dz = coord[2] * self.steps_in_mm - self.coord_step[2]
+        # В режиме непрерывного перемещения надо передавать шаги
         elif mode == "continuous":
             dx = coord[0]
             dy = coord[1]
