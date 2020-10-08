@@ -287,11 +287,15 @@ class MainWindow(QMainWindow):
             middle.append(int(self.table_controller.limits[1] / 2))
             middle.append(self.programSettings.shoot_height)
             # self.table_controller.coord_move(middle, mode="discret")
-            x = self.table_controller.coord_mm[0]
-            y = self.table_controller.coord_mm[1]
+            x = int(self.table_controller.limits[0] / 2)
+            y = int(self.table_controller.limits[1] / 2)
+
             pixels_in_mm = 10
+
             shoot = self.micros_controller.shoot(pixels_in_mm * (x - 10), pixels_in_mm * (y - 5),
                                                  pixels_in_mm * (x + 10), pixels_in_mm * (y + 5))
+            width = int(shoot.shape[1] / 10)
+            height = int(shoot.shape[0] / 10)
             self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
             # Направления для поиска краев
             direction_sequence = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]]
@@ -300,15 +304,30 @@ class MainWindow(QMainWindow):
                 while next_frame:
                     x += 20 * direction[0]
                     y += 10 * direction[0]
-                    shoot = self.micros_controller.shoot(x - 100, y - 50, x + 100, y + 50)
+                    shoot = self.micros_controller.shoot(pixels_in_mm * (x - width), pixels_in_mm * (y - height),
+                                                         pixels_in_mm * (x + width), pixels_in_mm * (y + height))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+                    if self.check_border_in_image(shoot, direction) == 'stop':
+                        next_frame = False
 
         finally:
             self.control_elements_enabled(True)
 
     # Вспомогательная функция для определения - достигла ли камера границы при поиске
     def check_border_in_image(self, img, direction):
-        pass
+        width = int(img.shape[1] / 10)
+        height = int(img.shape[0] / 10)
+        # Проверяем - не стало ли по направлению движения "чисто" (все линии)
+        clear_line = True
+        if direction[0] != 0:
+            x = int(img.shape[1] / 2)
+        else:
+
+        for i in range(5):
+
+        # Проверяем, что против направления движения "грязно" (1 лижнюю линию)
+        clear_line = False
+        return 'next'
 
     def scan(self):
         pass
