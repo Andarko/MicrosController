@@ -78,7 +78,7 @@ class MainWindow(QMainWindow):
         self.init_ui()
 
         shoot = self.micros_controller.shoot(1500, 2500, 2500, 3500)
-        self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+        # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
 
     # Создание элементов формы
     def init_ui(self):
@@ -291,43 +291,67 @@ class MainWindow(QMainWindow):
             y = int(self.table_controller.limits[1] / 2)
 
             pixels_in_mm = 10
+            width_half = 10
+            height_half = 5
+            delta_x = int(width_half * pixels_in_mm / 5)
+            delta_y = int(height_half * pixels_in_mm / 5)
 
-            shoot = self.micros_controller.shoot(pixels_in_mm * (x - 10), pixels_in_mm * (y - 5),
-                                                 pixels_in_mm * (x + 10), pixels_in_mm * (y + 5))
-            width = int(shoot.shape[1] / 10)
-            height = int(shoot.shape[0] / 10)
+            shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half), pixels_in_mm * (y - height_half),
+                                                 pixels_in_mm * (x + width_half), pixels_in_mm * (y + height_half))
+
             self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+            self.lbl_img.repaint()
             # Направления для поиска краев
-            direction_sequence = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]]
+            direction_sequence = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0], [0, 1]]
             for direction in direction_sequence:
                 next_frame = True
                 while next_frame:
-                    x += 20 * direction[0]
-                    y += 10 * direction[0]
-                    shoot = self.micros_controller.shoot(pixels_in_mm * (x - width), pixels_in_mm * (y - height),
-                                                         pixels_in_mm * (x + width), pixels_in_mm * (y + height))
+                    check_border_result = self.check_border_in_image(shoot, direction, [delta_x, delta_y])
+                    if check_border_result.startswith('next'):
+                        parts_count = int(check_border_result[4])
+                        x += int(delta_x * direction[0] * parts_count / pixels_in_mm)
+                        y += int(delta_y * direction[1] * parts_count / pixels_in_mm)
+                        # self.table_controller.coord_move([x, y], mode="discret")
+                        shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half),
+                                                             pixels_in_mm * (y - height_half),
+                                                             pixels_in_mm * (x + width_half),
+                                                             pixels_in_mm * (y + height_half))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
-                    if self.check_border_in_image(shoot, direction) == 'stop':
+                    self.lbl_img.repaint()
+                    print('x = ' + str(x) + '; y = ' + str(y))
+
+                    if check_border_result == 'stop':
                         next_frame = False
 
         finally:
             self.control_elements_enabled(True)
 
     # Вспомогательная функция для определения - достигла ли камера границы при поиске
-    def check_border_in_image(self, img, direction):
-        width = int(img.shape[1] / 10)
-        height = int(img.shape[0] / 10)
+    @staticmethod
+    def check_border_in_image(img, direction, delta):
         # Проверяем - не стало ли по направлению движения "чисто" (все линии)
-        clear_line = True
         if direction[0] != 0:
-            x = int(img.shape[1] / 2)
+            middle = int(img.shape[1] / 2)
+            if direction[0] > 0:
+                middle -= 1
+            for i in range(5, 0, -1):
+                x = middle + i * delta[0] * direction[0]
+                for y in range(img.shape[0]):
+                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                        return 'next' + str(i)
         else:
+            middle = int(img.shape[0] / 2)
+            if direction[1] > 0:
+                middle -= 1
+            for i in range(5, 0, -1):
+                y = middle + i * delta[1] * direction[1]
+                for x in range(img.shape[1]):
+                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                        return 'next' + str(i)
 
-        for i in range(5):
 
         # Проверяем, что против направления движения "грязно" (1 лижнюю линию)
-        clear_line = False
-        return 'next'
+        return 'stop'
 
     def scan(self):
         pass
@@ -458,7 +482,7 @@ class MicrosController:
         return pixmap
 
     def shoot(self, x1: int, y1: int, x2: int, y2: int):
-        time.sleep(0.5)
+        time.sleep(0.2)
         return np.copy(self.test_img[y1:y2, x1:x2, :])
 
 
