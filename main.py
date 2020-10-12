@@ -306,7 +306,7 @@ class MainWindow(QMainWindow):
             for direction in direction_sequence:
                 next_frame = True
                 while next_frame:
-                    check_border_result = self.check_border_in_image(shoot, direction, [delta_x, delta_y])
+                    check_border_result = self.find_border_in_image(shoot, direction, [delta_x, delta_y])
                     if check_border_result.startswith('next'):
                         parts_count = int(check_border_result[4])
                         x += int(delta_x * direction[0] * parts_count / pixels_in_mm)
@@ -326,9 +326,27 @@ class MainWindow(QMainWindow):
         finally:
             self.control_elements_enabled(True)
 
-    # Вспомогательная функция для определения - достигла ли камера границы при поиске
+    # Вспомогательная функция для определения - достигла ли камера границы при поиске в заданном направлении
     @staticmethod
-    def check_border_in_image(img, direction, delta):
+    def find_border_in_image(img, direction, delta):
+        # Проверяем - не стало ли по направлению движения "чисто" (все линии)
+        # main_direction = 0
+        # if direction[0] == 0:
+        #     main_direction = 1
+        # sec_direction = 1 - main_direction
+        #
+        # middle = int(img.shape[sec_direction] / 2)
+        # if direction[main_direction] > 0:
+        #     middle -= 1
+        # coord = [0, 0]
+        # for i in range(5, 0, -1):
+        #     x = middle + i * delta[main_direction] * direction[main_direction]
+        #     coord[main_direction] = x
+        #     for y in range(img.shape[0]):
+        #         coord[sec_direction] = y
+        #         if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+        #             return 'next' + str(i)
+
         # Проверяем - не стало ли по направлению движения "чисто" (все линии)
         if direction[0] != 0:
             middle = int(img.shape[1] / 2)
@@ -349,8 +367,31 @@ class MainWindow(QMainWindow):
                     if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
                         return 'next' + str(i)
 
+        return 'stop'
 
-        # Проверяем, что против направления движения "грязно" (1 лижнюю линию)
+    @staticmethod
+    # Вспомогательная функция - перед поиском границ проверяем, что он не "уполз в сторону"
+    def check_border_in_image(img, direction, delta):
+        # # Проверяем - не стало ли по направлению движения "чисто" (все линии)
+        # if direction[0] != 0:
+        #     middle = int(img.shape[1] / 2)
+        #     if direction[0] > 0:
+        #         middle -= 1
+        #     for i in range(5, 0, -1):
+        #         x = middle + i * delta[0] * direction[0]
+        #         for y in range(img.shape[0]):
+        #             if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+        #                 return 'next' + str(i)
+        # else:
+        #     middle = int(img.shape[0] / 2)
+        #     if direction[1] > 0:
+        #         middle -= 1
+        #     for i in range(5, 0, -1):
+        #         y = middle + i * delta[1] * direction[1]
+        #         for x in range(img.shape[1]):
+        #             if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+        #                 return 'next' + str(i)
+
         return 'stop'
 
     def scan(self):
@@ -445,7 +486,7 @@ class KeyboardButton:
 # Класс управления микроскопом (пока тестовая подделка)
 class MicrosController:
     def __init__(self):
-        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard.jpg"
+        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard_2.jpg"
         self.test_img = cv2.imread(self.test_img_path)[:, :, ::-1]
 
     @staticmethod
