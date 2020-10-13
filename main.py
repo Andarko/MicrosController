@@ -77,7 +77,7 @@ class MainWindow(QMainWindow):
 
         self.init_ui()
 
-        shoot = self.micros_controller.shoot(1500, 2500, 2500, 3500)
+        # shoot = self.micros_controller.shoot(1500, 2500, 2500, 3500)
         # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
 
     # Создание элементов формы
@@ -290,6 +290,11 @@ class MainWindow(QMainWindow):
             x = int(self.table_controller.limits[0] / 2)
             y = int(self.table_controller.limits[1] / 2)
 
+            all_x = list()
+            all_y = list()
+            all_x.append(x)
+            all_y.append(y)
+
             pixels_in_mm = 10
             width_half = 10
             height_half = 5
@@ -303,14 +308,55 @@ class MainWindow(QMainWindow):
             self.lbl_img.repaint()
             # Направления для поиска краев
             direction_sequence = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0], [0, 1]]
+            previous_direction = None
+            in_border = False
+
             for direction in direction_sequence:
                 next_frame = True
                 while next_frame:
+                    if previous_direction:
+                        steps_count = self.check_object_inside(shoot, previous_direction, [delta_x, delta_y])
+                        while steps_count > 0:
+                            x += int(delta_x * steps_count * previous_direction[0] / pixels_in_mm)
+                            y += int(delta_y * steps_count * previous_direction[1] / pixels_in_mm)
+                            all_x.append(x)
+                            all_y.append(y)
+                            # self.table_controller.coord_move([x, y], mode="discret")
+                            shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half),
+                                                                 pixels_in_mm * (y - height_half),
+                                                                 pixels_in_mm * (x + width_half),
+                                                                 pixels_in_mm * (y + height_half))
+                            print('x = ' + str(x) + '; y = ' + str(y) + ' inside correction')
+                            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+                            self.lbl_img.repaint()
+                            steps_count = self.check_object_inside(shoot, previous_direction, [delta_x, delta_y])
+                        previous_opposite_direction = list()
+                        previous_opposite_direction.append(-previous_direction[0])
+                        previous_opposite_direction.append(-previous_direction[1])
+
+                        steps_count = self.check_object_outside(shoot, previous_opposite_direction, [delta_x, delta_y])
+                        while steps_count > 0:
+                            x += int(delta_x * steps_count * previous_opposite_direction[0] / pixels_in_mm)
+                            y += int(delta_y * steps_count * previous_opposite_direction[1] / pixels_in_mm)
+                            all_x.append(x)
+                            all_y.append(y)
+                            # self.table_controller.coord_move([x, y], mode="discret")
+                            shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half),
+                                                                 pixels_in_mm * (y - height_half),
+                                                                 pixels_in_mm * (x + width_half),
+                                                                 pixels_in_mm * (y + height_half))
+                            print('x = ' + str(x) + '; y = ' + str(y) + ' outside correction')
+                            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+                            self.lbl_img.repaint()
+                            steps_count = self.check_object_outside(shoot, previous_direction, [delta_x, delta_y])
+
                     check_border_result = self.find_border_in_image(shoot, direction, [delta_x, delta_y])
                     if check_border_result.startswith('next'):
-                        parts_count = int(check_border_result[4])
-                        x += int(delta_x * direction[0] * parts_count / pixels_in_mm)
-                        y += int(delta_y * direction[1] * parts_count / pixels_in_mm)
+                        steps_count = int(check_border_result[4])
+                        x += int(delta_x * direction[0] * steps_count / pixels_in_mm)
+                        y += int(delta_y * direction[1] * steps_count / pixels_in_mm)
+                        all_x.append(x)
+                        all_y.append(y)
                         # self.table_controller.coord_move([x, y], mode="discret")
                         shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half),
                                                              pixels_in_mm * (y - height_half),
@@ -322,7 +368,11 @@ class MainWindow(QMainWindow):
 
                     if check_border_result == 'stop':
                         next_frame = False
-
+                previous_direction = direction
+            self.edt_border_x1.setText(str(min(all_x)))
+            self.edt_border_y1.setText(str(min(all_y)))
+            self.edt_border_x2.setText(str(max(all_x)))
+            self.edt_border_y2.setText(str(max(all_y)))
         finally:
             self.control_elements_enabled(True)
 
@@ -370,29 +420,73 @@ class MainWindow(QMainWindow):
         return 'stop'
 
     @staticmethod
-    # Вспомогательная функция - перед поиском границ проверяем, что он не "уполз в сторону"
-    def check_border_in_image(img, direction, delta):
-        # # Проверяем - не стало ли по направлению движения "чисто" (все линии)
-        # if direction[0] != 0:
-        #     middle = int(img.shape[1] / 2)
-        #     if direction[0] > 0:
-        #         middle -= 1
-        #     for i in range(5, 0, -1):
-        #         x = middle + i * delta[0] * direction[0]
-        #         for y in range(img.shape[0]):
-        #             if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
-        #                 return 'next' + str(i)
-        # else:
-        #     middle = int(img.shape[0] / 2)
-        #     if direction[1] > 0:
-        #         middle -= 1
-        #     for i in range(5, 0, -1):
-        #         y = middle + i * delta[1] * direction[1]
-        #         for x in range(img.shape[1]):
-        #             if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
-        #                 return 'next' + str(i)
+    # Вспомогательная функция - перед поиском границ проверяем, что камера не уехала от объекта
+    # Возвращает - сколько надо сделать шагов "внутрь"
+    def check_object_outside(img, direction, delta):
+        if direction[0] != 0:
+            middle = int(img.shape[1] / 2)
+            if direction[0] > 0:
+                middle -= 1
+            # Ищем хоть 1 пиксель объекта
+            for i in range(5, 0, -1):
+                white = True
+                x = middle + i * delta[0] * direction[0]
+                for y in range(img.shape[0]):
+                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                        white = False
+                        break
+                if white:
+                    return i
+        else:
+            white = True
+            middle = int(img.shape[0] / 2)
+            if direction[1] > 0:
+                middle -= 1
+            # Ищем хоть 1 пиксель объекта
+            for i in range(5, 0, -1):
+                y = middle + i * delta[1] * direction[1]
+                for x in range(img.shape[1]):
+                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                        white = False
+                        break
+                if white:
+                    return i
 
-        return 'stop'
+        return 0
+
+    @staticmethod
+    # Вспомогательная функция - перед поиском границ проверяем, что камера не уехала внутрь объекта
+    # Возвращает - сколько надо сделать шагов "наружу"
+    def check_object_inside(img, direction, delta):
+        if direction[0] != 0:
+            middle = int(img.shape[1] / 2)
+            if direction[0] > 0:
+                middle -= 1
+            # Ищем хоть одну "белую" линию "снаружи". Если она есть - значит все нормально
+            for i in range(5, 0, -1):
+                white = True
+                x = middle + i * delta[0] * direction[0]
+                for y in range(img.shape[0]):
+                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                        white = False
+                        break
+                if not white:
+                    return i
+        else:
+            middle = int(img.shape[0] / 2)
+            if direction[1] > 0:
+                middle -= 1
+            # Ищем хоть одну "белую" линию "снаружи". Если она есть - значит все нормально
+            for i in range(5, 0, -1):
+                white = True
+                y = middle + i * delta[1] * direction[1]
+                for x in range(img.shape[1]):
+                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                        white = False
+                        break
+                if not white:
+                    return i
+        return 0
 
     def scan(self):
         pass
@@ -524,6 +618,9 @@ class MicrosController:
 
     def shoot(self, x1: int, y1: int, x2: int, y2: int):
         time.sleep(0.2)
+        # y2_r = 640 - y1
+        # y1_r = 640 - y2
+        # return np.copy(self.test_img[y1_r:y2_r, x1:x2, :])
         return np.copy(self.test_img[y1:y2, x1:x2, :])
 
 
