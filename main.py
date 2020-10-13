@@ -318,7 +318,7 @@ class MainWindow(QMainWindow):
                         steps_count = self.check_object_inside(shoot, previous_direction, [delta_x, delta_y])
                         while steps_count > 0:
                             x += int(delta_x * steps_count * previous_direction[0] / pixels_in_mm)
-                            y += int(delta_y * steps_count * previous_direction[1] / pixels_in_mm)
+                            y -= int(delta_y * steps_count * previous_direction[1] / pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
                             # self.table_controller.coord_move([x, y], mode="discret")
@@ -337,7 +337,7 @@ class MainWindow(QMainWindow):
                         steps_count = self.check_object_outside(shoot, previous_opposite_direction, [delta_x, delta_y])
                         while steps_count > 0:
                             x += int(delta_x * steps_count * previous_opposite_direction[0] / pixels_in_mm)
-                            y += int(delta_y * steps_count * previous_opposite_direction[1] / pixels_in_mm)
+                            y -= int(delta_y * steps_count * previous_opposite_direction[1] / pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
                             # self.table_controller.coord_move([x, y], mode="discret")
@@ -354,7 +354,7 @@ class MainWindow(QMainWindow):
                     if check_border_result.startswith('next'):
                         steps_count = int(check_border_result[4])
                         x += int(delta_x * direction[0] * steps_count / pixels_in_mm)
-                        y += int(delta_y * direction[1] * steps_count / pixels_in_mm)
+                        y -= int(delta_y * direction[1] * steps_count / pixels_in_mm)
                         all_x.append(x)
                         all_y.append(y)
                         # self.table_controller.coord_move([x, y], mode="discret")
@@ -618,10 +618,12 @@ class MicrosController:
 
     def shoot(self, x1: int, y1: int, x2: int, y2: int):
         time.sleep(0.2)
-        # y2_r = 640 - y1
-        # y1_r = 640 - y2
-        # return np.copy(self.test_img[y1_r:y2_r, x1:x2, :])
-        return np.copy(self.test_img[y1:y2, x1:x2, :])
+        # return np.copy(self.test_img[y1:y2, x1:x2, :])
+        # Переворачиваем координаты съемки
+        y2_r = 640 - y1
+        y1_r = 640 - y2
+        return np.copy(self.test_img[y1_r:y2_r, x1:x2, :])
+
 
 
 # Класс, который общается с контроллером станка
