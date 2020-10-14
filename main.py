@@ -6,19 +6,14 @@
 import asyncio
 import time
 
-import pygame
 import websockets
-import logging
 
 from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QSizePolicy
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout
 from PyQt5.QtWidgets import QAction, QInputDialog, QLineEdit, QLabel, QPushButton, QTextEdit, QFormLayout
 from PyQt5.QtCore import QEvent, Qt
 import sys
-import keyboard
-import datetime
-import os
 import numpy as np
 import cv2
 
@@ -28,7 +23,6 @@ from vassal import Terminal
 from threading import Thread
 import json
 import math
-from pynput.keyboard import Key, Listener
 from settings_dialog import SettingsDialog, ProgramSettings
 
 
@@ -292,13 +286,10 @@ class MainWindow(QMainWindow):
             # if self.table_controller.server_status == 'uninit':
             #     self.table_controller.coord_init()
             # Перевод камеры к позиции, где должна располагаться микросхема
-            middle = list()
-            middle.append(int(self.table_controller.limits[0] / 2))
-            middle.append(int(self.table_controller.limits[1] / 2))
-            middle.append(self.programSettings.snap_height)
-            # self.table_controller.coord_move(middle, mode="discret")
+
             x = int(self.table_controller.limits[0] / 2)
             y = int(self.table_controller.limits[1] / 2)
+            # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
 
             all_x = list()
             all_y = list()
@@ -327,7 +318,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            # self.table_controller.coord_move([x, y], mode="discret")
+                            # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                                 self.pixels_in_mm * (y - self.snap_height_half),
                                                                 self.pixels_in_mm * (x + self.snap_width_half),
@@ -350,7 +341,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            # self.table_controller.coord_move([x, y], mode="discret")
+                            # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                                 self.pixels_in_mm * (y - self.snap_height_half),
                                                                 self.pixels_in_mm * (x + self.snap_width_half),
@@ -371,11 +362,11 @@ class MainWindow(QMainWindow):
                         y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
                         all_x.append(x)
                         all_y.append(y)
-                        # self.table_controller.coord_move([x, y], mode="discret")
+                        # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                         snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                            self.pixels_in_mm * (y - self.snap_height_half),
-                                                            self.pixels_in_mm * (x + self.snap_width_half),
-                                                            self.pixels_in_mm * (y + self.snap_height_half))
+                                                           self.pixels_in_mm * (y - self.snap_height_half),
+                                                           self.pixels_in_mm * (x + self.snap_width_half),
+                                                           self.pixels_in_mm * (y + self.snap_height_half))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                     self.lbl_img.repaint()
                     print('x = ' + str(x) + '; y = ' + str(y))
@@ -527,19 +518,21 @@ class MainWindow(QMainWindow):
         for y in range(y1, y2 + 1, self.snap_height):
             if left_dir:
                 for x in range(x2, x1 - 1, -self.snap_width):
+                    # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                     snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                        self.pixels_in_mm * (y - self.snap_height_half),
-                                                        self.pixels_in_mm * (x + self.snap_width_half),
-                                                        self.pixels_in_mm * (y + self.snap_height_half))
+                                                       self.pixels_in_mm * (y - self.snap_height_half),
+                                                       self.pixels_in_mm * (x + self.snap_width_half),
+                                                       self.pixels_in_mm * (y + self.snap_height_half))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                     self.lbl_img.repaint()
                     print('x = ' + str(x) + '; y = ' + str(y))
             else:
                 for x in range(x1, x2 + 1, self.snap_width):
+                    # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                     snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                        self.pixels_in_mm * (y - self.snap_height_half),
-                                                        self.pixels_in_mm * (x + self.snap_width_half),
-                                                        self.pixels_in_mm * (y + self.snap_height_half))
+                                                       self.pixels_in_mm * (y - self.snap_height_half),
+                                                       self.pixels_in_mm * (x + self.snap_width_half),
+                                                       self.pixels_in_mm * (y + self.snap_height_half))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                     self.lbl_img.repaint()
                     print('x = ' + str(x) + '; y = ' + str(y))
@@ -765,7 +758,8 @@ class TableController:
             dy = coord[1] * self.steps_in_mm - self.coord_step[1]
             dz = coord[2] * self.steps_in_mm - self.coord_step[2]
         # В режиме непрерывного перемещения надо передавать шаги
-        elif mode == "continuous":
+        # if mode == "continuous"
+        else:
             dx = coord[0]
             dy = coord[1]
             dz = coord[2]
