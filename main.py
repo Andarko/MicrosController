@@ -60,6 +60,15 @@ class MainWindow(QMainWindow):
         self.thread_continuous = Thread(target=self.continuous_move)
         self.thread_continuous.start()
 
+        # TEST
+        self.pixels_in_mm = 10
+        self.snap_width_half = 10
+        self.snap_height_half = 5
+        self.snap_width = 2 * self.snap_width_half
+        self.snap_height = 2 * self.snap_height_half
+        self.delta_x = int(self.snap_width_half * self.pixels_in_mm / 5)
+        self.delta_y = int(self.snap_height_half * self.pixels_in_mm / 5)
+
         # Доступные для взаимодействия компоненты формы
         self.lbl_img = QLabel()
         self.lbl_coord = QLabel("Текущие координаты:")
@@ -77,8 +86,8 @@ class MainWindow(QMainWindow):
 
         self.init_ui()
 
-        # shoot = self.micros_controller.shoot(1500, 2500, 2500, 3500)
-        # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+        # snap = self.micros_controller.snap(1500, 2500, 2500, 3500)
+        # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
 
     # Создание элементов формы
     def init_ui(self):
@@ -164,10 +173,7 @@ class MainWindow(QMainWindow):
         self.edt_border_y1.setMaximumHeight(30)
         self.edt_border_x2.setMaximumHeight(30)
         self.edt_border_y2.setMaximumHeight(30)
-        self.edt_border_x1.setEnabled(False)
-        self.edt_border_y1.setEnabled(False)
-        self.edt_border_x2.setEnabled(False)
-        self.edt_border_y2.setEnabled(False)
+
 
         border_form_layout.addRow(QLabel("x1"), self.edt_border_x1)
         border_form_layout.addRow(QLabel("y1"), self.edt_border_y1)
@@ -245,6 +251,10 @@ class MainWindow(QMainWindow):
         self.btn_move.setEnabled(status)
         self.btn_border.setEnabled(status)
         self.btn_scan.setEnabled(status)
+        self.edt_border_x1.setEnabled(status)
+        self.edt_border_y1.setEnabled(status)
+        self.edt_border_x2.setEnabled(status)
+        self.edt_border_y2.setEnabled(status)
 
     # Тестовая функция для рисования круга и спирали
     def test_circle(self):
@@ -285,7 +295,7 @@ class MainWindow(QMainWindow):
             middle = list()
             middle.append(int(self.table_controller.limits[0] / 2))
             middle.append(int(self.table_controller.limits[1] / 2))
-            middle.append(self.programSettings.shoot_height)
+            middle.append(self.programSettings.snap_height)
             # self.table_controller.coord_move(middle, mode="discret")
             x = int(self.table_controller.limits[0] / 2)
             y = int(self.table_controller.limits[1] / 2)
@@ -295,16 +305,12 @@ class MainWindow(QMainWindow):
             all_x.append(x)
             all_y.append(y)
 
-            pixels_in_mm = 10
-            width_half = 10
-            height_half = 5
-            delta_x = int(width_half * pixels_in_mm / 5)
-            delta_y = int(height_half * pixels_in_mm / 5)
+            snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                                                self.pixels_in_mm * (y - self.snap_height_half),
+                                                self.pixels_in_mm * (x + self.snap_width_half),
+                                                self.pixels_in_mm * (y + self.snap_height_half))
 
-            shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half), pixels_in_mm * (y - height_half),
-                                                 pixels_in_mm * (x + width_half), pixels_in_mm * (y + height_half))
-
-            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
             self.lbl_img.repaint()
             # Направления для поиска краев
             direction_sequence = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0], [0, 1]]
@@ -315,54 +321,62 @@ class MainWindow(QMainWindow):
                 next_frame = True
                 while next_frame:
                     if previous_direction:
-                        steps_count = self.check_object_inside(shoot, previous_direction, [delta_x, delta_y])
+                        steps_count = self.check_object_inside(snap, previous_direction, [self.delta_x, self.delta_y])
                         while steps_count > 0:
-                            x += int(delta_x * steps_count * previous_direction[0] / pixels_in_mm)
-                            y -= int(delta_y * steps_count * previous_direction[1] / pixels_in_mm)
+                            x += int(self.delta_x * steps_count * previous_direction[0] / self.pixels_in_mm)
+                            y -= int(self.delta_y * steps_count * previous_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
                             # self.table_controller.coord_move([x, y], mode="discret")
-                            shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half),
-                                                                 pixels_in_mm * (y - height_half),
-                                                                 pixels_in_mm * (x + width_half),
-                                                                 pixels_in_mm * (y + height_half))
+                            snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                                                                self.pixels_in_mm * (y - self.snap_height_half),
+                                                                self.pixels_in_mm * (x + self.snap_width_half),
+                                                                self.pixels_in_mm * (y + self.snap_height_half))
                             print('x = ' + str(x) + '; y = ' + str(y) + ' inside correction')
-                            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+                            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                             self.lbl_img.repaint()
-                            steps_count = self.check_object_inside(shoot, previous_direction, [delta_x, delta_y])
+                            steps_count = self.check_object_inside(snap,
+                                                                   previous_direction,
+                                                                   [self.delta_x, self.delta_y])
                         previous_opposite_direction = list()
                         previous_opposite_direction.append(-previous_direction[0])
                         previous_opposite_direction.append(-previous_direction[1])
 
-                        steps_count = self.check_object_outside(shoot, previous_opposite_direction, [delta_x, delta_y])
+                        steps_count = self.check_object_outside(snap,
+                                                                previous_opposite_direction,
+                                                                [self.delta_x, self.delta_y])
                         while steps_count > 0:
-                            x += int(delta_x * steps_count * previous_opposite_direction[0] / pixels_in_mm)
-                            y -= int(delta_y * steps_count * previous_opposite_direction[1] / pixels_in_mm)
+                            x += int(self.delta_x * steps_count * previous_opposite_direction[0] / self.pixels_in_mm)
+                            y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
                             # self.table_controller.coord_move([x, y], mode="discret")
-                            shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half),
-                                                                 pixels_in_mm * (y - height_half),
-                                                                 pixels_in_mm * (x + width_half),
-                                                                 pixels_in_mm * (y + height_half))
+                            snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                                                                self.pixels_in_mm * (y - self.snap_height_half),
+                                                                self.pixels_in_mm * (x + self.snap_width_half),
+                                                                self.pixels_in_mm * (y + self.snap_height_half))
                             print('x = ' + str(x) + '; y = ' + str(y) + ' outside correction')
-                            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+                            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                             self.lbl_img.repaint()
-                            steps_count = self.check_object_outside(shoot, previous_direction, [delta_x, delta_y])
+                            steps_count = self.check_object_outside(snap,
+                                                                    previous_direction,
+                                                                    [self.delta_x, self.delta_y])
 
-                    check_border_result = self.find_border_in_image(shoot, direction, [delta_x, delta_y])
+                    check_border_result = self.find_border_in_image(snap,
+                                                                    direction,
+                                                                    [self.delta_x, self.delta_y])
                     if check_border_result.startswith('next'):
                         steps_count = int(check_border_result[4])
-                        x += int(delta_x * direction[0] * steps_count / pixels_in_mm)
-                        y -= int(delta_y * direction[1] * steps_count / pixels_in_mm)
+                        x += int(self.delta_x * direction[0] * steps_count / self.pixels_in_mm)
+                        y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
                         all_x.append(x)
                         all_y.append(y)
                         # self.table_controller.coord_move([x, y], mode="discret")
-                        shoot = self.micros_controller.shoot(pixels_in_mm * (x - width_half),
-                                                             pixels_in_mm * (y - height_half),
-                                                             pixels_in_mm * (x + width_half),
-                                                             pixels_in_mm * (y + height_half))
-                    self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(shoot))
+                        snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                                                            self.pixels_in_mm * (y - self.snap_height_half),
+                                                            self.pixels_in_mm * (x + self.snap_width_half),
+                                                            self.pixels_in_mm * (y + self.snap_height_half))
+                    self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                     self.lbl_img.repaint()
                     print('x = ' + str(x) + '; y = ' + str(y))
 
@@ -489,7 +503,47 @@ class MainWindow(QMainWindow):
         return 0
 
     def scan(self):
-        pass
+        try:
+            x1 = int(self.edt_border_x1.toPlainText())
+            y1 = int(self.edt_border_y1.toPlainText())
+            x2 = int(self.edt_border_x2.toPlainText())
+            y2 = int(self.edt_border_y2.toPlainText())
+        except ValueError:
+            print("Неверный формат данных")
+            return
+
+        overage_x = x2 - x1 - self.snap_width * int((x2 - x1) / self.snap_width)
+        deficit_x = self.snap_width - overage_x
+        x2 += int(deficit_x / 2)
+        x1 -= deficit_x - int(deficit_x / 2)
+
+        overage_y = y2 - y1 - self.snap_height * int((y2 - y1) / self.snap_height)
+        deficit_y = self.snap_height - overage_y
+        y2 += int(deficit_y / 2)
+        y1 -= deficit_y - int(deficit_y / 2)
+        print("x1={0}; y1={1}; x2={2}; y2={3}".format(x1, y1, x2, y2))
+
+        left_dir = True
+        for y in range(y1, y2 + 1, self.snap_height):
+            if left_dir:
+                for x in range(x2, x1 - 1, -self.snap_width):
+                    snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                                                        self.pixels_in_mm * (y - self.snap_height_half),
+                                                        self.pixels_in_mm * (x + self.snap_width_half),
+                                                        self.pixels_in_mm * (y + self.snap_height_half))
+                    self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+                    self.lbl_img.repaint()
+                    print('x = ' + str(x) + '; y = ' + str(y))
+            else:
+                for x in range(x1, x2 + 1, self.snap_width):
+                    snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                                                        self.pixels_in_mm * (y - self.snap_height_half),
+                                                        self.pixels_in_mm * (x + self.snap_width_half),
+                                                        self.pixels_in_mm * (y + self.snap_height_half))
+                    self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+                    self.lbl_img.repaint()
+                    print('x = ' + str(x) + '; y = ' + str(y))
+            left_dir = not left_dir
 
     # Обработчики событий формы и ее компонентов
     def eventFilter(self, obj, event):
@@ -580,7 +634,7 @@ class KeyboardButton:
 # Класс управления микроскопом (пока тестовая подделка)
 class MicrosController:
     def __init__(self):
-        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard_2.jpg"
+        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard.jpg"
         self.test_img = cv2.imread(self.test_img_path)[:, :, ::-1]
 
     @staticmethod
@@ -616,14 +670,13 @@ class MicrosController:
         pixmap = QtGui.QPixmap.fromImage(q_img)
         return pixmap
 
-    def shoot(self, x1: int, y1: int, x2: int, y2: int):
-        time.sleep(0.2)
+    def snap(self, x1: int, y1: int, x2: int, y2: int):
+        time.sleep(0.1)
         # return np.copy(self.test_img[y1:y2, x1:x2, :])
         # Переворачиваем координаты съемки
-        y2_r = 640 - y1
-        y1_r = 640 - y2
+        y2_r = 6400 - y1
+        y1_r = 6400 - y2
         return np.copy(self.test_img[y1_r:y2_r, x1:x2, :])
-
 
 
 # Класс, который общается с контроллером станка

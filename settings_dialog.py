@@ -4,7 +4,7 @@ import configparser
 
 class ProgramSettings(object):
     def __init__(self):
-        self.shoot_height = 20
+        self.snap_height = 20
 
 
 class SettingsDialog(QDialog):
