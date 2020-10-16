@@ -5,7 +5,7 @@
 
 import asyncio
 import time
-
+import os
 import websockets
 
 from PyQt5.QtGui import QImage
@@ -513,10 +513,14 @@ class MainWindow(QMainWindow):
         y2 += int(deficit_y / 2)
         y1 -= deficit_y - int(deficit_y / 2)
         print("x1={0}; y1={1}; x2={2}; y2={3}".format(x1, y1, x2, y2))
+        if not os.path.exists("SavedImg"):
+            os.mkdir("SavedImg")
 
         left_dir = True
+        j = int((y2 - y1) / self.snap_height) + 1
         for y in range(y1, y2 + 1, self.snap_height):
             if left_dir:
+                i = int((x2 - x1) / self.snap_width) + 1
                 for x in range(x2, x1 - 1, -self.snap_width):
                     # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                     snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
@@ -525,9 +529,13 @@ class MainWindow(QMainWindow):
                                                        self.pixels_in_mm * (y + self.snap_height_half))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                     self.lbl_img.repaint()
+                    cv2.imwrite(os.path.join("SavedImg", "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
                     print('x = ' + str(x) + '; y = ' + str(y))
+                    i -= 1
             else:
+                i = 0
                 for x in range(x1, x2 + 1, self.snap_width):
+                    i += 1
                     # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                     snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                        self.pixels_in_mm * (y - self.snap_height_half),
@@ -535,8 +543,10 @@ class MainWindow(QMainWindow):
                                                        self.pixels_in_mm * (y + self.snap_height_half))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                     self.lbl_img.repaint()
+                    cv2.imwrite(os.path.join("SavedImg", "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
                     print('x = ' + str(x) + '; y = ' + str(y))
             left_dir = not left_dir
+            j -= 1
 
     # Обработчики событий формы и ее компонентов
     def eventFilter(self, obj, event):
@@ -627,7 +637,7 @@ class KeyboardButton:
 # Класс управления микроскопом (пока тестовая подделка)
 class MicrosController:
     def __init__(self):
-        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard.jpg"
+        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard_2.jpg"
         self.test_img = cv2.imread(self.test_img_path)[:, :, ::-1]
 
     @staticmethod
