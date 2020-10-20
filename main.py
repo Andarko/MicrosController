@@ -283,8 +283,8 @@ class MainWindow(QMainWindow):
         self.control_elements_enabled(False)
         search_step = 5
         try:
-            # if self.table_controller.server_status == 'uninit':
-            #     self.table_controller.coord_init()
+            if self.table_controller.server_status == 'uninit':
+                self.table_controller.coord_init()
             # Перевод камеры к позиции, где должна располагаться микросхема
 
             x = int(self.table_controller.limits[0] / 2)
@@ -318,7 +318,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                                 self.pixels_in_mm * (y - self.snap_height_half),
                                                                 self.pixels_in_mm * (x + self.snap_width_half),
@@ -341,7 +341,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                                 self.pixels_in_mm * (y - self.snap_height_half),
                                                                 self.pixels_in_mm * (x + self.snap_width_half),
@@ -362,7 +362,7 @@ class MainWindow(QMainWindow):
                         y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
                         all_x.append(x)
                         all_y.append(y)
-                        # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                        self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                         snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                            self.pixels_in_mm * (y - self.snap_height_half),
                                                            self.pixels_in_mm * (x + self.snap_width_half),
@@ -503,6 +503,9 @@ class MainWindow(QMainWindow):
             print("Неверный формат данных")
             return
 
+        if self.table_controller.server_status == 'uninit':
+            self.table_controller.coord_init()
+
         overage_x = x2 - x1 - self.snap_width * int((x2 - x1) / self.snap_width)
         deficit_x = self.snap_width - overage_x
         x2 += int(deficit_x / 2)
@@ -522,7 +525,7 @@ class MainWindow(QMainWindow):
             if left_dir:
                 i = int((x2 - x1) / self.snap_width) + 1
                 for x in range(x2, x1 - 1, -self.snap_width):
-                    # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                    self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                     snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                        self.pixels_in_mm * (y - self.snap_height_half),
                                                        self.pixels_in_mm * (x + self.snap_width_half),
@@ -536,7 +539,7 @@ class MainWindow(QMainWindow):
                 i = 0
                 for x in range(x1, x2 + 1, self.snap_width):
                     i += 1
-                    # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                    self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
                     snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                        self.pixels_in_mm * (y - self.snap_height_half),
                                                        self.pixels_in_mm * (x + self.snap_width_half),
@@ -637,7 +640,7 @@ class KeyboardButton:
 # Класс управления микроскопом (пока тестовая подделка)
 class MicrosController:
     def __init__(self):
-        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard_2.jpg"
+        self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard.jpg"
         self.test_img = cv2.imread(self.test_img_path)[:, :, ::-1]
 
     @staticmethod
@@ -777,7 +780,9 @@ class TableController:
         data = self.get_request(x_step=dx, y_step=dy, z_step=dz, mode=mode)
 
         result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
-        print("<=" + str(result))
+        f = open('test.txt', 'a')
+        f.write("<=" + str(result) + '\r\n')
+        # print("<=" + str(result))
         self.result_unpack(result)
 
     def server_check(self):
