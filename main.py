@@ -16,6 +16,7 @@ from PyQt5.QtCore import QEvent, Qt
 import sys
 import numpy as np
 import cv2
+import datetime
 
 
 from PyQt5 import QtGui
@@ -283,13 +284,13 @@ class MainWindow(QMainWindow):
         self.control_elements_enabled(False)
         search_step = 5
         try:
-            if self.table_controller.server_status == 'uninit':
+            if self.table_controller.server_status == 'uninitialized':
                 self.table_controller.coord_init()
             # Перевод камеры к позиции, где должна располагаться микросхема
 
             x = int(self.table_controller.limits[0] / 2)
             y = int(self.table_controller.limits[1] / 2)
-            # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+            # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
 
             all_x = list()
             all_y = list()
@@ -318,7 +319,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
                             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                                 self.pixels_in_mm * (y - self.snap_height_half),
                                                                 self.pixels_in_mm * (x + self.snap_width_half),
@@ -341,7 +342,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
                             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                                 self.pixels_in_mm * (y - self.snap_height_half),
                                                                 self.pixels_in_mm * (x + self.snap_width_half),
@@ -362,7 +363,7 @@ class MainWindow(QMainWindow):
                         y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
                         all_x.append(x)
                         all_y.append(y)
-                        self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                        self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
                         snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                            self.pixels_in_mm * (y - self.snap_height_half),
                                                            self.pixels_in_mm * (x + self.snap_width_half),
@@ -503,7 +504,7 @@ class MainWindow(QMainWindow):
             print("Неверный формат данных")
             return
 
-        if self.table_controller.server_status == 'uninit':
+        if self.table_controller.server_status == 'uninitialized':
             self.table_controller.coord_init()
 
         overage_x = x2 - x1 - self.snap_width * int((x2 - x1) / self.snap_width)
@@ -525,7 +526,7 @@ class MainWindow(QMainWindow):
             if left_dir:
                 i = int((x2 - x1) / self.snap_width) + 1
                 for x in range(x2, x1 - 1, -self.snap_width):
-                    self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                    self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
                     snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                        self.pixels_in_mm * (y - self.snap_height_half),
                                                        self.pixels_in_mm * (x + self.snap_width_half),
@@ -539,7 +540,7 @@ class MainWindow(QMainWindow):
                 i = 0
                 for x in range(x1, x2 + 1, self.snap_width):
                     i += 1
-                    self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discret")
+                    self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
                     snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                                                        self.pixels_in_mm * (y - self.snap_height_half),
                                                        self.pixels_in_mm * (x + self.snap_width_half),
@@ -695,7 +696,7 @@ class TableController:
         self.hostname = hostname
         self.port = port
         # Текущий статус севрера
-        self.server_status = 'uninit'
+        self.server_status = 'uninitialized'
         # Текущий статус станка: работает или нет
         self.operation_status = ''
         self.coord_step = [-1, -1, -1]
@@ -706,8 +707,9 @@ class TableController:
         self.loop = loop
         self.thread_server = Thread(target=self.server_start)
 
-        self.limits = (340, 640, 70)
         self.steps_in_mm = 80
+        self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
+
 
     def __repr__(self):
         return "coord = " + str(self.coord_mm) + "; server status = " + self.server_status \
@@ -730,29 +732,29 @@ class TableController:
             result = await ws.recv()
             return result
 
-    @staticmethod
-    def get_request(x_step: int, y_step: int, z_step: int, mode: str):
+    def get_request(self, x_step: int, y_step: int, z_step: int, mode: str):
         data = {
-            "x": x_step,
+            "x": self.limits_step[0] - x_step,
             "y": y_step,
             "z": z_step,
-            "mode": mode  # continuous/discret/init/check
+            "mode": mode  # continuous/discrete/init/check
         }
-
         data_string = json.dumps(data)
         return data_string
 
     def result_unpack(self, result):
         result_str = json.loads(result)
-        self.coord_step = [result_str['x'], result_str['y'], result_str['z']]
+        # Переворот по оси Х
+        self.coord_step = [self.limits_step[0] - result_str['x'], result_str['y'], result_str['z']]
         self.coord_mm = [int(result_str['x'] / self.steps_in_mm),
                          int(result_str['y'] / self.steps_in_mm),
                          int(result_str['z'] / self.steps_in_mm)]
+
         self.operation_status = result_str['status']
         self.server_status = result_str['status']
 
     def coord_init(self):
-        # loop = asyncio.get_event_loop()
+        pass
         data = self.get_request(x_step=0, y_step=0, z_step=0, mode="init")
         result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
         self.result_unpack(result)
@@ -764,15 +766,16 @@ class TableController:
         self.result_unpack(result)
 
     # Команда движения установки
-    def coord_move(self, coord, mode="discret"):
+    def coord_move(self, coord, mode="discrete"):
+        pass
         # В режиме точечного перемещения надо передавать миллиметры
-        if mode == "discret" and min(self.coord_step) >= 0:
+        if mode == "discrete" and min(self.coord_step) >= 0:
             dx = coord[0] * self.steps_in_mm - self.coord_step[0]
             dy = coord[1] * self.steps_in_mm - self.coord_step[1]
             dz = coord[2] * self.steps_in_mm - self.coord_step[2]
         # В режиме непрерывного перемещения надо передавать шаги
-        # if mode == "continuous"
         else:
+            # if mode == "continuous"
             dx = coord[0]
             dy = coord[1]
             dz = coord[2]
@@ -781,8 +784,8 @@ class TableController:
 
         result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
         f = open('test.txt', 'a')
-        f.write("<=" + str(result) + '\r\n')
-        # print("<=" + str(result))
+        now = datetime.datetime.now()
+        f.write(now.strftime("%m.%d.%Y %H:%M:%S") + "<=" + str(result) + '\r\n')
         self.result_unpack(result)
 
     def server_check(self):

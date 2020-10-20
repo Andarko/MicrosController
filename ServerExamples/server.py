@@ -16,7 +16,7 @@ class Server:
     clients = set()
 
     def __init__(self):
-        self.status = "uninited"
+        self.status = "uninitialized"
 
         self.coordX = -1
         self.coordY = -1
@@ -53,7 +53,7 @@ class Server:
             if (request["mode"] == "init"):
                 response = await self.init()
                 await self.send_to_clients(response)
-            elif (request["mode"] == "discret"):
+            elif (request["mode"] == "discrete"):
                 response = await self.move_xyz(request)
                 await self.send_to_clients(response)
             elif (request["mode"] == "check"):
