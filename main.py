@@ -288,9 +288,9 @@ class MainWindow(QMainWindow):
                 self.table_controller.coord_init()
             # Перевод камеры к позиции, где должна располагаться микросхема
 
-            x = int(self.table_controller.limits[0] / 2)
-            y = int(self.table_controller.limits[1] / 2)
-            # self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
+            x = int(self.table_controller.limits_step[0] / self.table_controller.steps_in_mm / 2)
+            y = int(self.table_controller.limits_step[1] / self.table_controller.steps_in_mm / 2)
+            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
 
             all_x = list()
             all_y = list()
@@ -298,9 +298,9 @@ class MainWindow(QMainWindow):
             all_y.append(y)
 
             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                self.pixels_in_mm * (y - self.snap_height_half),
-                                                self.pixels_in_mm * (x + self.snap_width_half),
-                                                self.pixels_in_mm * (y + self.snap_height_half))
+                                               self.pixels_in_mm * (y - self.snap_height_half),
+                                               self.pixels_in_mm * (x + self.snap_width_half),
+                                               self.pixels_in_mm * (y + self.snap_height_half))
 
             self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
             self.lbl_img.repaint()
@@ -321,9 +321,9 @@ class MainWindow(QMainWindow):
                             all_y.append(y)
                             self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
                             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                                self.pixels_in_mm * (y - self.snap_height_half),
-                                                                self.pixels_in_mm * (x + self.snap_width_half),
-                                                                self.pixels_in_mm * (y + self.snap_height_half))
+                                                               self.pixels_in_mm * (y - self.snap_height_half),
+                                                               self.pixels_in_mm * (x + self.snap_width_half),
+                                                               self.pixels_in_mm * (y + self.snap_height_half))
                             print('x = ' + str(x) + '; y = ' + str(y) + ' inside correction')
                             self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                             self.lbl_img.repaint()
@@ -344,9 +344,9 @@ class MainWindow(QMainWindow):
                             all_y.append(y)
                             self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
                             snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                                self.pixels_in_mm * (y - self.snap_height_half),
-                                                                self.pixels_in_mm * (x + self.snap_width_half),
-                                                                self.pixels_in_mm * (y + self.snap_height_half))
+                                                               self.pixels_in_mm * (y - self.snap_height_half),
+                                                               self.pixels_in_mm * (x + self.snap_width_half),
+                                                               self.pixels_in_mm * (y + self.snap_height_half))
                             print('x = ' + str(x) + '; y = ' + str(y) + ' outside correction')
                             self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                             self.lbl_img.repaint()
@@ -734,7 +734,7 @@ class TableController:
 
     def get_request(self, x_step: int, y_step: int, z_step: int, mode: str):
         data = {
-            "x": self.limits_step[0] - x_step,
+            "x": -x_step,
             "y": y_step,
             "z": z_step,
             "mode": mode  # continuous/discrete/init/check
@@ -746,9 +746,9 @@ class TableController:
         result_str = json.loads(result)
         # Переворот по оси Х
         self.coord_step = [self.limits_step[0] - result_str['x'], result_str['y'], result_str['z']]
-        self.coord_mm = [int(result_str['x'] / self.steps_in_mm),
-                         int(result_str['y'] / self.steps_in_mm),
-                         int(result_str['z'] / self.steps_in_mm)]
+        self.coord_mm = [int(self.coord_step[0] / self.steps_in_mm),
+                         int(self.coord_step[1] / self.steps_in_mm),
+                         int(self.coord_step[2] / self.steps_in_mm)]
 
         self.operation_status = result_str['status']
         self.server_status = result_str['status']
@@ -785,7 +785,7 @@ class TableController:
         result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
         f = open('test.txt', 'a')
         now = datetime.datetime.now()
-        f.write(now.strftime("%m.%d.%Y %H:%M:%S") + "<=" + str(result) + '\r\n')
+        f.write(now.strftime("%d.%m.%Y %H:%M:%S") + "<=" + str(result) + '\r\n')
         self.result_unpack(result)
 
     def server_check(self):
