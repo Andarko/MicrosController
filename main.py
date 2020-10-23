@@ -4,12 +4,13 @@
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
 import asyncio
+# import shutil
 import time
 import os
 import websockets
 
 from PyQt5.QtGui import QImage
-from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QSizePolicy
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QSizePolicy, QFileDialog, QMessageBox
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout
 from PyQt5.QtWidgets import QAction, QInputDialog, QLineEdit, QLabel, QPushButton, QTextEdit, QFormLayout
 from PyQt5.QtCore import QEvent, Qt
@@ -17,13 +18,15 @@ import sys
 import numpy as np
 import cv2
 import datetime
-
+import zipfile
 
 from PyQt5 import QtGui
 from vassal import Terminal
 from threading import Thread
 import json
 import math
+import xml.etree.ElementTree as Xml
+
 from settings_dialog import SettingsDialog, ProgramSettings
 
 
@@ -41,7 +44,6 @@ class MainWindow(QMainWindow):
         if not self.table_controller.thread_server or not self.table_controller.thread_server.is_alive():
             self.table_controller.thread_server.start()
         time.sleep(2.0)
-        print("server started")
         # self.micros_controller.coord_check()
         self.continuous_mode = False
         self.closed = False
@@ -55,7 +57,11 @@ class MainWindow(QMainWindow):
         self.thread_continuous = Thread(target=self.continuous_move)
         self.thread_continuous.start()
 
+        self.dir_for_img = "SavedImg"
+        self.path_for_xml_file = os.path.join(self.dir_for_img, "settings.xml")
+
         # TEST
+        self.table_controller.test = True
         self.pixels_in_mm = 10
         self.snap_width_half = 10
         self.snap_height_half = 5
@@ -76,9 +82,11 @@ class MainWindow(QMainWindow):
         self.edt_border_y2 = QTextEdit()
         self.btn_border = QPushButton("Определить границы")
         self.btn_scan = QPushButton("Новая съемка")
+        self.btn_save_scan = QPushButton("Сохранить съемку")
 
         self.programSettings = ProgramSettings()
-
+        if self.table_controller.test:
+            print("Внимание! Программа работает в тестовом режиме!")
         self.init_ui()
 
         # snap = self.micros_controller.snap(1500, 2500, 2500, 3500)
@@ -169,7 +177,6 @@ class MainWindow(QMainWindow):
         self.edt_border_x2.setMaximumHeight(30)
         self.edt_border_y2.setMaximumHeight(30)
 
-
         border_form_layout.addRow(QLabel("x1"), self.edt_border_x1)
         border_form_layout.addRow(QLabel("y1"), self.edt_border_y1)
         border_form_layout.addRow(QLabel("x2"), self.edt_border_x2)
@@ -191,6 +198,9 @@ class MainWindow(QMainWindow):
         self.btn_border.clicked.connect(self.border_find)
         right_layout.addWidget(self.btn_scan)
         self.btn_scan.clicked.connect(self.scan)
+        right_layout.addWidget(self.btn_save_scan)
+        self.btn_save_scan.clicked.connect(self.save_scan)
+        self.btn_save_scan.setEnabled(False)
 
         self.installEventFilter(self)
 
@@ -508,18 +518,27 @@ class MainWindow(QMainWindow):
             self.table_controller.coord_init()
 
         overage_x = x2 - x1 - self.snap_width * int((x2 - x1) / self.snap_width)
-        deficit_x = self.snap_width - overage_x
+        deficit_x = 0
+        if overage_x > 0:
+            deficit_x = self.snap_width - overage_x
+
         x2 += int(deficit_x / 2)
         x1 -= deficit_x - int(deficit_x / 2)
 
         overage_y = y2 - y1 - self.snap_height * int((y2 - y1) / self.snap_height)
-        deficit_y = self.snap_height - overage_y
+        deficit_y = 0
+        if overage_y > 0:
+            deficit_y = self.snap_height - overage_y
         y2 += int(deficit_y / 2)
         y1 -= deficit_y - int(deficit_y / 2)
         print("x1={0}; y1={1}; x2={2}; y2={3}".format(x1, y1, x2, y2))
-        if not os.path.exists("SavedImg"):
-            os.mkdir("SavedImg")
-
+        # Работа с директорией для сохранения изображений
+        # shutil.rmtree(self.dir_for_img)
+        if not os.path.exists(self.dir_for_img):
+            os.mkdir(self.dir_for_img)
+        for file in os.listdir(self.dir_for_img):
+            os.remove(os.path.join(self.dir_for_img, file))
+        # Получение и сохранение изображений в директорию
         left_dir = True
         j = int((y2 - y1) / self.snap_height) + 1
         for y in range(y1, y2 + 1, self.snap_height):
@@ -533,7 +552,7 @@ class MainWindow(QMainWindow):
                                                        self.pixels_in_mm * (y + self.snap_height_half))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                     self.lbl_img.repaint()
-                    cv2.imwrite(os.path.join("SavedImg", "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
+                    cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
                     print('x = ' + str(x) + '; y = ' + str(y))
                     i -= 1
             else:
@@ -547,10 +566,74 @@ class MainWindow(QMainWindow):
                                                        self.pixels_in_mm * (y + self.snap_height_half))
                     self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
                     self.lbl_img.repaint()
-                    cv2.imwrite(os.path.join("SavedImg", "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
+                    cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
                     print('x = ' + str(x) + '; y = ' + str(y))
             left_dir = not left_dir
             j -= 1
+
+        # Создание файла описания XML
+        root = Xml.Element("Root")
+        elem_rc = Xml.Element("RowCount")
+        elem_rc.text = str(int((y2 - y1) / self.snap_height) + 1)
+        root.append(elem_rc)
+        elem_cc = Xml.Element("ColCount")
+        elem_cc.text = str(int((x2 - x1) / self.snap_width) + 1)
+        root.append(elem_cc)
+        elem_img = Xml.Element("Image")
+        root.append(elem_img)
+        img_format = Xml.SubElement(elem_img, "Format")
+        img_format.text = "jpg"
+        img_size = Xml.SubElement(elem_img, "ImgSize")
+        img_size_width = Xml.SubElement(img_size, "Width")
+        img_size_width.text = str(self.snap_width)
+        img_size_height = Xml.SubElement(img_size, "Height")
+        img_size_height.text = str(self.snap_height)
+        img_con_area = Xml.SubElement(elem_img, "ConnectionArea")
+        ica_x = Xml.SubElement(img_con_area, "X")
+        ica_x.text = str(0)
+        ica_y = Xml.SubElement(img_con_area, "Y")
+        ica_y.text = str(0)
+        ica_width = Xml.SubElement(img_con_area, "Width")
+        ica_width.text = str(self.snap_width)
+        ica_height = Xml.SubElement(img_con_area, "Height")
+        ica_height.text = str(self.snap_height)
+
+        tree = Xml.ElementTree(root)
+        with open(self.path_for_xml_file, "w") as f_obj:
+            tree.write(self.path_for_xml_file)
+        self.btn_save_scan.setEnabled(True)
+
+    # Сохранение изображений в архивный файл
+    def save_scan(self):
+        if not os.path.exists(self.path_for_xml_file):
+            return
+        file_filter = "Microscope scans (*.misc)"
+        a = QFileDialog.getSaveFileName(self, "Выберите место сохранения файла", "/",
+                                        "All files (*.*);;Microscope scans (*.misc)", file_filter)
+
+        if len(a[0]) > 0:
+            ext = os.path.splitext(a[0])
+            if ext[1] == ".misc":
+                file_name = a[0]
+            else:
+                file_name = ext[0] + ".misc"
+            if os.path.exists(file_name):
+                dlg_result = QMessageBox.question(self, "Confirm Dialog",
+                                                  "Файл уже существует. " +
+                                                  "Хотите его перезаписать?" +
+                                                  " Это удалит данные в нем",
+                                                  QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if dlg_result == QMessageBox.No:
+                    return
+        else:
+            return
+
+        z = zipfile.ZipFile(file_name, 'w')
+        for root, dirs, files in os.walk(self.dir_for_img):
+            for file in files:
+                if file:
+                    z.write(os.path.join(self.dir_for_img, file), file, compress_type=zipfile.ZIP_DEFLATED)
+        QMessageBox.information(self, "Info Dialog", "Файл сохранен", QMessageBox.Ok, QMessageBox.Ok)
 
     # Обработчики событий формы и ее компонентов
     def eventFilter(self, obj, event):
@@ -709,7 +792,8 @@ class TableController:
 
         self.steps_in_mm = 80
         self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
-
+        # Режим тестирования - без работы с установкой
+        self.test: bool
 
     def __repr__(self):
         return "coord = " + str(self.coord_mm) + "; server status = " + self.server_status \
@@ -732,7 +816,8 @@ class TableController:
             result = await ws.recv()
             return result
 
-    def get_request(self, x_step: int, y_step: int, z_step: int, mode: str):
+    @staticmethod
+    def get_request(x_step: int, y_step: int, z_step: int, mode: str):
         data = {
             "x": -x_step,
             "y": y_step,
@@ -754,39 +839,40 @@ class TableController:
         self.server_status = result_str['status']
 
     def coord_init(self):
-        pass
-        data = self.get_request(x_step=0, y_step=0, z_step=0, mode="init")
-        result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
-        self.result_unpack(result)
+        if not self.test:
+            data = self.get_request(x_step=0, y_step=0, z_step=0, mode="init")
+            result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
+            self.result_unpack(result)
 
     def coord_check(self):
-        # loop = asyncio.get_event_loop()
-        data = self.get_request(x_step=0, y_step=0, z_step=0, mode="check")
-        result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
-        self.result_unpack(result)
+        if not self.test:
+            # loop = asyncio.get_event_loop()
+            data = self.get_request(x_step=0, y_step=0, z_step=0, mode="check")
+            result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
+            self.result_unpack(result)
 
     # Команда движения установки
     def coord_move(self, coord, mode="discrete"):
-        pass
-        # В режиме точечного перемещения надо передавать миллиметры
-        if mode == "discrete" and min(self.coord_step) >= 0:
-            dx = coord[0] * self.steps_in_mm - self.coord_step[0]
-            dy = coord[1] * self.steps_in_mm - self.coord_step[1]
-            dz = coord[2] * self.steps_in_mm - self.coord_step[2]
-        # В режиме непрерывного перемещения надо передавать шаги
-        else:
-            # if mode == "continuous"
-            dx = coord[0]
-            dy = coord[1]
-            dz = coord[2]
-        # loop = asyncio.get_event_loop()
-        data = self.get_request(x_step=dx, y_step=dy, z_step=dz, mode=mode)
+        if not self.test:
+            # В режиме точечного перемещения надо передавать миллиметры
+            if mode == "discrete" and min(self.coord_step) >= 0:
+                dx = coord[0] * self.steps_in_mm - self.coord_step[0]
+                dy = coord[1] * self.steps_in_mm - self.coord_step[1]
+                dz = coord[2] * self.steps_in_mm - self.coord_step[2]
+            # В режиме непрерывного перемещения надо передавать шаги
+            else:
+                # if mode == "continuous"
+                dx = coord[0]
+                dy = coord[1]
+                dz = coord[2]
+            # loop = asyncio.get_event_loop()
+            data = self.get_request(x_step=dx, y_step=dy, z_step=dz, mode=mode)
 
-        result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
-        f = open('test.txt', 'a')
-        now = datetime.datetime.now()
-        f.write(now.strftime("%d.%m.%Y %H:%M:%S") + "<=" + str(result) + '\r\n')
-        self.result_unpack(result)
+            result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
+            f = open('test.txt', 'a')
+            now = datetime.datetime.now()
+            f.write(now.strftime("%d.%m.%Y %H:%M:%S") + "<=" + str(result) + '\r\n')
+            self.result_unpack(result)
 
     def server_check(self):
         pass
