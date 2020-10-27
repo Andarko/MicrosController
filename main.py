@@ -391,28 +391,11 @@ class MainWindow(QMainWindow):
             self.edt_border_y2.setText(str(max(all_y)))
         finally:
             self.control_elements_enabled(True)
+            QMessageBox.information(self, "Info Dialog", "Границы проверены", QMessageBox.Ok, QMessageBox.Ok)
 
     # Вспомогательная функция для определения - достигла ли камера границы при поиске в заданном направлении
     @staticmethod
     def find_border_in_image(img, direction, delta):
-        # Проверяем - не стало ли по направлению движения "чисто" (все линии)
-        # main_direction = 0
-        # if direction[0] == 0:
-        #     main_direction = 1
-        # sec_direction = 1 - main_direction
-        #
-        # middle = int(img.shape[sec_direction] / 2)
-        # if direction[main_direction] > 0:
-        #     middle -= 1
-        # coord = [0, 0]
-        # for i in range(5, 0, -1):
-        #     x = middle + i * delta[main_direction] * direction[main_direction]
-        #     coord[main_direction] = x
-        #     for y in range(img.shape[0]):
-        #         coord[sec_direction] = y
-        #         if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
-        #             return 'next' + str(i)
-
         # Проверяем - не стало ли по направлению движения "чисто" (все линии)
         if direction[0] != 0:
             middle = int(img.shape[1] / 2)
@@ -539,9 +522,21 @@ class MainWindow(QMainWindow):
         for file in os.listdir(self.dir_for_img):
             os.remove(os.path.join(self.dir_for_img, file))
         # Получение и сохранение изображений в директорию
-        left_dir = True
+        left_dir = abs(self.table_controller.coord_mm[0] - x1) > abs(self.table_controller.coord_mm[0] - x2)
+
+        y_start = y1
+        y_finish = y2 + 1
+        y_delta = self.snap_height
         j = int((y2 - y1) / self.snap_height) + 1
-        for y in range(y1, y2 + 1, self.snap_height):
+        d_j = -1
+        if abs(self.table_controller.coord_mm[1] - y1) > abs(self.table_controller.coord_mm[1] - y2):
+            y_start = y2
+            y_finish = y1 - 1
+            y_delta = -self.snap_height
+            j = 1
+            d_j = 1
+
+        for y in range(y_start, y_finish, y_delta):
             if left_dir:
                 i = int((x2 - x1) / self.snap_width) + 1
                 for x in range(x2, x1 - 1, -self.snap_width):
@@ -569,7 +564,7 @@ class MainWindow(QMainWindow):
                     cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
                     print('x = ' + str(x) + '; y = ' + str(y))
             left_dir = not left_dir
-            j -= 1
+            j += d_j
 
         # Создание файла описания XML
         root = Xml.Element("Root")
@@ -602,6 +597,7 @@ class MainWindow(QMainWindow):
         with open(self.path_for_xml_file, "w") as f_obj:
             tree.write(self.path_for_xml_file)
         self.btn_save_scan.setEnabled(True)
+        QMessageBox.information(self, "Info Dialog", "Сканирование завершено", QMessageBox.Ok, QMessageBox.Ok)
 
     # Сохранение изображений в архивный файл
     def save_scan(self):
@@ -843,6 +839,11 @@ class TableController:
             data = self.get_request(x_step=0, y_step=0, z_step=0, mode="init")
             result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
             self.result_unpack(result)
+        else:
+            self.coord_step = [self.limits_step[0], 0, 0]
+            self.coord_mm = [self.limits_step[0] / self.steps_in_mm, 0, 0]
+            self.operation_status = 'init'
+            self.server_status = 'init'
 
     def coord_check(self):
         if not self.test:
@@ -854,8 +855,10 @@ class TableController:
     # Команда движения установки
     def coord_move(self, coord, mode="discrete"):
         if not self.test:
+            if min(self.coord_step) < 0:
+                return
             # В режиме точечного перемещения надо передавать миллиметры
-            if mode == "discrete" and min(self.coord_step) >= 0:
+            if mode == "discrete":
                 dx = coord[0] * self.steps_in_mm - self.coord_step[0]
                 dy = coord[1] * self.steps_in_mm - self.coord_step[1]
                 dz = coord[2] * self.steps_in_mm - self.coord_step[2]
@@ -867,12 +870,22 @@ class TableController:
                 dz = coord[2]
             # loop = asyncio.get_event_loop()
             data = self.get_request(x_step=dx, y_step=dy, z_step=dz, mode=mode)
-
             result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
             f = open('test.txt', 'a')
             now = datetime.datetime.now()
             f.write(now.strftime("%d.%m.%Y %H:%M:%S") + "<=" + str(result) + '\r\n')
             self.result_unpack(result)
+        else:
+            if mode == "discrete":
+                self.coord_mm[0] = coord[0]
+                self.coord_mm[1] = coord[1]
+                self.coord_mm[2] = coord[2]
+                self.coord_step[0] = self.coord_mm[0] * self.steps_in_mm
+                self.coord_step[1] = self.coord_mm[1] * self.steps_in_mm
+                self.coord_step[2] = self.coord_mm[2] * self.steps_in_mm
+
+            self.operation_status = 'init'
+            self.server_status = 'init'
 
     def server_check(self):
         pass
@@ -904,3 +917,4 @@ if __name__ == '__main__':
     sys.exit(app.exec_())
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
+
