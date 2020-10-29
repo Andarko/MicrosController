@@ -60,15 +60,22 @@ class MainWindow(QMainWindow):
         self.dir_for_img = "SavedImg"
         self.path_for_xml_file = os.path.join(self.dir_for_img, "settings.xml")
 
+        self.programSettings = ProgramSettings()
         # TEST
         self.table_controller.test = True
-        self.pixels_in_mm = 10
-        self.snap_width_half = 10
-        self.snap_height_half = 5
+        self.pixels_in_mm = self.programSettings.pixels_in_mm
+        self.snap_width_half = self.programSettings.snap_width_half
+        self.snap_height_half = self.programSettings.snap_height_half
         self.snap_width = 2 * self.snap_width_half
         self.snap_height = 2 * self.snap_height_half
         self.delta_x = int(self.snap_width_half * self.pixels_in_mm / 5)
         self.delta_y = int(self.snap_height_half * self.pixels_in_mm / 5)
+        # Наличие несохраненного изображения
+        self.unsaved = False
+
+
+        if self.table_controller.test:
+            print("Внимание! Программа работает в тестовом режиме!")
 
         # Доступные для взаимодействия компоненты формы
         self.lbl_img = QLabel()
@@ -84,9 +91,6 @@ class MainWindow(QMainWindow):
         self.btn_scan = QPushButton("Новая съемка")
         self.btn_save_scan = QPushButton("Сохранить съемку")
 
-        self.programSettings = ProgramSettings()
-        if self.table_controller.test:
-            print("Внимание! Программа работает в тестовом режиме!")
         self.init_ui()
 
         # snap = self.micros_controller.snap(1500, 2500, 2500, 3500)
@@ -211,6 +215,17 @@ class MainWindow(QMainWindow):
         self.show()
 
     def closeEvent(self, event):
+        if self.unsaved:
+            dlg_result = QMessageBox.question(self,
+                                              "Confirm Dialog",
+                                              "Данные последней съемки не сохранены. Хотите сперва их сохранить?",
+                                              QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                                              QMessageBox.Yes)
+            if dlg_result == QMessageBox.Yes:
+                if not self.save_scan():
+                    return
+            elif dlg_result == QMessageBox.Cancel:
+                event.ignore()
         self.closed = True
 
     @staticmethod
@@ -290,9 +305,9 @@ class MainWindow(QMainWindow):
         #     for i in range(100):
         #         self.micros_controller.coord_move([0, -d_steps, 0], mode='continuous')
 
+    # Функция идет по границе изделия и записывает пределы для съемки
     def border_find(self):
         self.control_elements_enabled(False)
-        search_step = 5
         try:
             if self.table_controller.server_status == 'uninitialized':
                 self.table_controller.coord_init()
@@ -300,43 +315,48 @@ class MainWindow(QMainWindow):
 
             x = int(self.table_controller.limits_step[0] / self.table_controller.steps_in_mm / 2)
             y = int(self.table_controller.limits_step[1] / self.table_controller.steps_in_mm / 2)
-            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
+            snap = self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
 
             all_x = list()
             all_y = list()
             all_x.append(x)
             all_y.append(y)
 
-            snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                               self.pixels_in_mm * (y - self.snap_height_half),
-                                               self.pixels_in_mm * (x + self.snap_width_half),
-                                               self.pixels_in_mm * (y + self.snap_height_half))
-
-            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-            self.lbl_img.repaint()
+            # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+            #                                    self.pixels_in_mm * (y - self.snap_height_half),
+            #                                    self.pixels_in_mm * (x + self.snap_width_half),
+            #                                    self.pixels_in_mm * (y + self.snap_height_half))
+            #
+            # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+            # self.lbl_img.repaint()
             # Направления для поиска краев
             direction_sequence = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0], [0, 1]]
             previous_direction = None
             in_border = False
 
             for direction in direction_sequence:
+                # Берем следующий фрейм до тех пор, пока не выйдем за границу изделтя
                 next_frame = True
                 while next_frame:
+                    # При наличии предыдущего направления движения (все, кроме первого направления)
+                    # проверяем, не смещается ли изделие поперек линии поиска
                     if previous_direction:
                         steps_count = self.check_object_inside(snap, previous_direction, [self.delta_x, self.delta_y])
+                        # Проверяем - не ушли ли мы вовнутрь объекта
                         while steps_count > 0:
                             x += int(self.delta_x * steps_count * previous_direction[0] / self.pixels_in_mm)
                             y -= int(self.delta_y * steps_count * previous_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
-                            snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                               self.pixels_in_mm * (y - self.snap_height_half),
-                                                               self.pixels_in_mm * (x + self.snap_width_half),
-                                                               self.pixels_in_mm * (y + self.snap_height_half))
+                            snap = self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                            # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                            #                                    self.pixels_in_mm * (y - self.snap_height_half),
+                            #                                    self.pixels_in_mm * (x + self.snap_width_half),
+                            #                                    self.pixels_in_mm * (y + self.snap_height_half))
+                            # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+                            # self.lbl_img.repaint()
                             print('x = ' + str(x) + '; y = ' + str(y) + ' inside correction')
-                            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-                            self.lbl_img.repaint()
+
                             steps_count = self.check_object_inside(snap,
                                                                    previous_direction,
                                                                    [self.delta_x, self.delta_y])
@@ -347,19 +367,20 @@ class MainWindow(QMainWindow):
                         steps_count = self.check_object_outside(snap,
                                                                 previous_opposite_direction,
                                                                 [self.delta_x, self.delta_y])
+                        # Проверяем - не ушли ли мы наружу объекта
                         while steps_count > 0:
                             x += int(self.delta_x * steps_count * previous_opposite_direction[0] / self.pixels_in_mm)
                             y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
-                            snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                               self.pixels_in_mm * (y - self.snap_height_half),
-                                                               self.pixels_in_mm * (x + self.snap_width_half),
-                                                               self.pixels_in_mm * (y + self.snap_height_half))
+                            self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                            # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                            #                                    self.pixels_in_mm * (y - self.snap_height_half),
+                            #                                    self.pixels_in_mm * (x + self.snap_width_half),
+                            #                                    self.pixels_in_mm * (y + self.snap_height_half))
+                            # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+                            # self.lbl_img.repaint()
                             print('x = ' + str(x) + '; y = ' + str(y) + ' outside correction')
-                            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-                            self.lbl_img.repaint()
                             steps_count = self.check_object_outside(snap,
                                                                     previous_direction,
                                                                     [self.delta_x, self.delta_y])
@@ -367,19 +388,20 @@ class MainWindow(QMainWindow):
                     check_border_result = self.find_border_in_image(snap,
                                                                     direction,
                                                                     [self.delta_x, self.delta_y])
+                    # Можно идти в направлении поиска границы еще
                     if check_border_result.startswith('next'):
                         steps_count = int(check_border_result[4])
                         x += int(self.delta_x * direction[0] * steps_count / self.pixels_in_mm)
                         y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
                         all_x.append(x)
                         all_y.append(y)
-                        self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
-                        snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                           self.pixels_in_mm * (y - self.snap_height_half),
-                                                           self.pixels_in_mm * (x + self.snap_width_half),
-                                                           self.pixels_in_mm * (y + self.snap_height_half))
-                    self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-                    self.lbl_img.repaint()
+                        self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                        # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                        #                                    self.pixels_in_mm * (y - self.snap_height_half),
+                        #                                    self.pixels_in_mm * (x + self.snap_width_half),
+                        #                                    self.pixels_in_mm * (y + self.snap_height_half))
+                        # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+                        # self.lbl_img.repaint()
                     print('x = ' + str(x) + '; y = ' + str(y))
 
                     if check_border_result == 'stop':
@@ -391,7 +413,7 @@ class MainWindow(QMainWindow):
             self.edt_border_y2.setText(str(max(all_y)))
         finally:
             self.control_elements_enabled(True)
-            QMessageBox.information(self, "Info Dialog", "Границы проверены", QMessageBox.Ok, QMessageBox.Ok)
+            QMessageBox.information(self, "Info Dialog", "Границы определены", QMessageBox.Ok, QMessageBox.Ok)
 
     # Вспомогательная функция для определения - достигла ли камера границы при поиске в заданном направлении
     @staticmethod
@@ -488,6 +510,17 @@ class MainWindow(QMainWindow):
         return 0
 
     def scan(self):
+        if self.unsaved:
+            dlg_result = QMessageBox.question(self,
+                                              "Confirm Dialog",
+                                              "Данные последней съемки не сохранены. Хотите сперва их сохранить?",
+                                              QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                                              QMessageBox.Yes)
+            if dlg_result == QMessageBox.Yes:
+                if not self.save_scan():
+                    return
+            elif dlg_result == QMessageBox.Cancel:
+                return
         try:
             x1 = int(self.edt_border_x1.toPlainText())
             y1 = int(self.edt_border_y1.toPlainText())
@@ -523,7 +556,7 @@ class MainWindow(QMainWindow):
             os.remove(os.path.join(self.dir_for_img, file))
         # Получение и сохранение изображений в директорию
         left_dir = abs(self.table_controller.coord_mm[0] - x1) > abs(self.table_controller.coord_mm[0] - x2)
-
+        # выбираем обход изображения, исходя из того - ближе мы к его верху или низу
         y_start = y1
         y_finish = y2 + 1
         y_delta = self.snap_height
@@ -540,13 +573,13 @@ class MainWindow(QMainWindow):
             if left_dir:
                 i = int((x2 - x1) / self.snap_width) + 1
                 for x in range(x2, x1 - 1, -self.snap_width):
-                    self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
-                    snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                       self.pixels_in_mm * (y - self.snap_height_half),
-                                                       self.pixels_in_mm * (x + self.snap_width_half),
-                                                       self.pixels_in_mm * (y + self.snap_height_half))
-                    self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-                    self.lbl_img.repaint()
+                    snap = self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                    # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                    #                                    self.pixels_in_mm * (y - self.snap_height_half),
+                    #                                    self.pixels_in_mm * (x + self.snap_width_half),
+                    #                                    self.pixels_in_mm * (y + self.snap_height_half))
+                    # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+                    # self.lbl_img.repaint()
                     cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
                     print('x = ' + str(x) + '; y = ' + str(y))
                     i -= 1
@@ -554,13 +587,13 @@ class MainWindow(QMainWindow):
                 i = 0
                 for x in range(x1, x2 + 1, self.snap_width):
                     i += 1
-                    self.table_controller.coord_move([x, y, self.programSettings.snap_height], mode="discrete")
-                    snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                                                       self.pixels_in_mm * (y - self.snap_height_half),
-                                                       self.pixels_in_mm * (x + self.snap_width_half),
-                                                       self.pixels_in_mm * (y + self.snap_height_half))
-                    self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-                    self.lbl_img.repaint()
+                    snap = self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                    # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+                    #                                    self.pixels_in_mm * (y - self.snap_height_half),
+                    #                                    self.pixels_in_mm * (x + self.snap_width_half),
+                    #                                    self.pixels_in_mm * (y + self.snap_height_half))
+                    # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+                    # self.lbl_img.repaint()
                     cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
                     print('x = ' + str(x) + '; y = ' + str(y))
             left_dir = not left_dir
@@ -580,29 +613,30 @@ class MainWindow(QMainWindow):
         img_format.text = "jpg"
         img_size = Xml.SubElement(elem_img, "ImgSize")
         img_size_width = Xml.SubElement(img_size, "Width")
-        img_size_width.text = str(self.snap_width)
+        img_size_width.text = str(self.snap_width * self.pixels_in_mm)
         img_size_height = Xml.SubElement(img_size, "Height")
-        img_size_height.text = str(self.snap_height)
+        img_size_height.text = str(self.snap_height * self.pixels_in_mm)
         img_con_area = Xml.SubElement(elem_img, "ConnectionArea")
         ica_x = Xml.SubElement(img_con_area, "X")
         ica_x.text = str(0)
         ica_y = Xml.SubElement(img_con_area, "Y")
         ica_y.text = str(0)
         ica_width = Xml.SubElement(img_con_area, "Width")
-        ica_width.text = str(self.snap_width)
+        ica_width.text = str(self.snap_width * self.pixels_in_mm)
         ica_height = Xml.SubElement(img_con_area, "Height")
-        ica_height.text = str(self.snap_height)
+        ica_height.text = str(self.snap_height * self.pixels_in_mm)
 
         tree = Xml.ElementTree(root)
         with open(self.path_for_xml_file, "w") as f_obj:
             tree.write(self.path_for_xml_file)
         self.btn_save_scan.setEnabled(True)
         QMessageBox.information(self, "Info Dialog", "Сканирование завершено", QMessageBox.Ok, QMessageBox.Ok)
+        self.unsaved = True
 
     # Сохранение изображений в архивный файл
     def save_scan(self):
         if not os.path.exists(self.path_for_xml_file):
-            return
+            return False
         file_filter = "Microscope scans (*.misc)"
         a = QFileDialog.getSaveFileName(self, "Выберите место сохранения файла", "/",
                                         "All files (*.*);;Microscope scans (*.misc)", file_filter)
@@ -620,9 +654,9 @@ class MainWindow(QMainWindow):
                                                   " Это удалит данные в нем",
                                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                 if dlg_result == QMessageBox.No:
-                    return
+                    return False
         else:
-            return
+            return False
 
         z = zipfile.ZipFile(file_name, 'w')
         for root, dirs, files in os.walk(self.dir_for_img):
@@ -630,6 +664,8 @@ class MainWindow(QMainWindow):
                 if file:
                     z.write(os.path.join(self.dir_for_img, file), file, compress_type=zipfile.ZIP_DEFLATED)
         QMessageBox.information(self, "Info Dialog", "Файл сохранен", QMessageBox.Ok, QMessageBox.Ok)
+        self.unsaved = False
+        return True
 
     # Обработчики событий формы и ее компонентов
     def eventFilter(self, obj, event):
@@ -884,8 +920,16 @@ class TableController:
                 self.coord_step[1] = self.coord_mm[1] * self.steps_in_mm
                 self.coord_step[2] = self.coord_mm[2] * self.steps_in_mm
 
-            self.operation_status = 'init'
-            self.server_status = 'init'
+        snap = self.micros_controller.snap(self.pixels_in_mm * (self.coord_mm[0] - self.snap_width_half),
+                                           self.pixels_in_mm * (self.coord_mm[1] - self.snap_height_half),
+                                           self.pixels_in_mm * (self.coord_mm[0] + self.snap_width_half),
+                                           self.pixels_in_mm * (self.coord_mm[1] + self.snap_height_half))
+
+        self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+        self.lbl_img.repaint()
+        self.operation_status = 'init'
+        self.server_status = 'init'
+        return snap
 
     def server_check(self):
         pass

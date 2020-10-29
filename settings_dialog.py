@@ -4,8 +4,9 @@ import configparser
 
 class ProgramSettings(object):
     def __init__(self):
-        self.snap_height = 20
-
+        self.pixels_in_mm = 10
+        self.snap_width_half = 10
+        self.snap_height_half = 5
 
 class SettingsDialog(QDialog):
     def __init__(self, program_settings=ProgramSettings()):
