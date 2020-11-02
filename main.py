@@ -221,6 +221,21 @@ class MainWindow(QMainWindow):
 
         self.show()
 
+    # Тестовая обертка функции движения, чтобы обходиться без подключенного станка
+    def coord_move(self, coord, mode="discrete"):
+        self.table_controller.coord_move(coord, mode)
+        snap = self.micros_controller.snap(int(self.pixels_in_mm * (self.table_controller.coord_mm[0]
+                                                                    - self.snap_width_half)),
+                                           int(self.pixels_in_mm * (self.table_controller.coord_mm[1]
+                                                                    - self.snap_height_half)),
+                                           int(self.pixels_in_mm * (self.table_controller.coord_mm[0]
+                                                                    + self.snap_width_half)),
+                                           int(self.pixels_in_mm * (self.table_controller.coord_mm[1]
+                                                                    + self.snap_height_half)))
+        self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+        self.lbl_img.repaint()
+        self.setWindowTitle(str(self.table_controller))
+
     def closeEvent(self, event):
         if self.unsaved:
             dlg_result = QMessageBox.question(self,
@@ -264,7 +279,7 @@ class MainWindow(QMainWindow):
 
         if ok:
             coord = [int(item) for item in text.split(';')]
-            self.table_controller.coord_move(coord)
+            self.coord_move(coord)
             self.setWindowTitle(str(self.table_controller))
 
         self.control_elements_enabled(True)
@@ -273,7 +288,7 @@ class MainWindow(QMainWindow):
         self.control_elements_enabled(False)
         x = int(self.table_controller.limits_step[0] / self.table_controller.steps_in_mm / 2)
         y = int(self.table_controller.limits_step[1] / self.table_controller.steps_in_mm / 2)
-        self.table_controller.coord_move([x, y, self.table_controller.coord_mm[2]])
+        self.coord_move([x, y, self.table_controller.coord_mm[2]])
         self.setWindowTitle(str(self.table_controller))
         self.control_elements_enabled(True)
 
@@ -303,7 +318,7 @@ class MainWindow(QMainWindow):
             alfa = (i / count) * 2 * math.pi
             dx = int(r * math.sin(alfa))
             dy = int(r * math.cos(alfa))
-            self.table_controller.coord_move([dx, dy, 0], mode='continuous')
+            self.coord_move([dx, dy, 0], mode='continuous')
 
             # self.micros_controller.coord_move([self.micros_controller.coord[0] + dx,
             #                                    self.micros_controller.coord[1] + dy,
@@ -331,7 +346,7 @@ class MainWindow(QMainWindow):
 
             x = int(self.table_controller.limits_step[0] / self.table_controller.steps_in_mm / 2)
             y = int(self.table_controller.limits_step[1] / self.table_controller.steps_in_mm / 2)
-            snap = self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+            snap = self.coord_move([x, y, self.snap_height], mode="discrete")
 
             all_x = list()
             all_y = list()
@@ -364,7 +379,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            snap = self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                            snap = self.coord_move([x, y, self.snap_height], mode="discrete")
                             # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                             #                                    self.pixels_in_mm * (y - self.snap_height_half),
                             #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -389,7 +404,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                            self.coord_move([x, y, self.snap_height], mode="discrete")
                             # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                             #                                    self.pixels_in_mm * (y - self.snap_height_half),
                             #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -411,7 +426,7 @@ class MainWindow(QMainWindow):
                         y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
                         all_x.append(x)
                         all_y.append(y)
-                        self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                        self.coord_move([x, y, self.snap_height], mode="discrete")
                         # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                         #                                    self.pixels_in_mm * (y - self.snap_height_half),
                         #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -589,7 +604,7 @@ class MainWindow(QMainWindow):
             if left_dir:
                 i = int((x2 - x1) / self.snap_width) + 1
                 for x in range(x2, x1 - 1, -self.snap_width):
-                    snap = self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                    snap = self.coord_move([x, y, self.snap_height], mode="discrete")
                     # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                     #                                    self.pixels_in_mm * (y - self.snap_height_half),
                     #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -603,7 +618,7 @@ class MainWindow(QMainWindow):
                 i = 0
                 for x in range(x1, x2 + 1, self.snap_width):
                     i += 1
-                    snap = self.table_controller.coord_move([x, y, self.snap_height], mode="discrete")
+                    snap = self.coord_move([x, y, self.snap_height], mode="discrete")
                     # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                     #                                    self.pixels_in_mm * (y - self.snap_height_half),
                     #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -710,22 +725,22 @@ class MainWindow(QMainWindow):
                 if self.key_shift_pressed:
                     steps_count = 8
                 if self.keyboard_buttons[Qt.Key_W].check_click():
-                    self.table_controller.coord_move([0, steps_count, 0], mode="continuous")
+                    self.coord_move([0, steps_count, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_D].check_click():
-                    self.table_controller.coord_move([-steps_count, 0, 0], mode="continuous")
+                    self.coord_move([-steps_count, 0, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_S].check_click():
-                    self.table_controller.coord_move([0, -steps_count, 0], mode="continuous")
+                    self.coord_move([0, -steps_count, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_A].check_click():
-                    self.table_controller.coord_move([steps_count, 0, 0], mode="continuous")
+                    self.coord_move([steps_count, 0, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_Plus].check_click():
-                    self.table_controller.coord_move([0, 0, steps_count], mode="continuous")
+                    self.coord_move([0, 0, steps_count], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_Minus].check_click():
-                    self.table_controller.coord_move([0, 0, -steps_count], mode="continuous")
+                    self.coord_move([0, 0, -steps_count], mode="continuous")
                     # someone_clicked = True
                 # if someone_clicked:
                 time.sleep(0.001)
@@ -842,8 +857,8 @@ class TableController:
         self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
         # Режим тестирования - без работы с установкой
         self.test: bool
-        self.micros_controller: MicrosController = None
-        self.programSettings: ProgramSettings = None
+        # self.micros_controller: MicrosController = None
+        # self.programSettings: ProgramSettings = None
 
     def __repr__(self):
         return "coord = " + str(self.coord_mm) + "; server status = " + self.server_status \
@@ -937,21 +952,30 @@ class TableController:
                 self.coord_step[0] = self.coord_mm[0] * self.steps_in_mm
                 self.coord_step[1] = self.coord_mm[1] * self.steps_in_mm
                 self.coord_step[2] = self.coord_mm[2] * self.steps_in_mm
+            else:
+                # if mode == "continuous"
+                coord[0] = -coord[0]
+                for i in range(3):
+                    self.coord_step[i] += coord[i]
+                    if self.coord_step[i] < 0:
+                        self.coord_step[i] = 0
+                    if self.coord_step[i] > self.limits_step[i]:
+                        self.coord_step[i] = self.limits_step[i]
+                    self.coord_mm[i] = self.coord_step[i] / self.steps_in_mm
 
-        snap = self.micros_controller.snap(self.programSettings.pixels_in_mm * (self.coord_mm[0] -
-                                                                                self.programSettings.snap_width_half),
-                                           self.programSettings.pixels_in_mm * (self.coord_mm[1] -
-                                                                                self.programSettings.snap_height_half),
-                                           self.programSettings.pixels_in_mm * (self.coord_mm[0] +
-                                                                                self.programSettings.snap_width_half),
-                                           self.programSettings.pixels_in_mm * (self.coord_mm[1] +
-                                                                                self.programSettings.snap_height_half))
+                # snap = self.micros_controller.snap(self.programSettings.pixels_in_mm * (self.coord_mm[0] -
+        #                                                                         self.programSettings.snap_width_half),
+        #                                    self.programSettings.pixels_in_mm * (self.coord_mm[1] -
+        #                                                                         self.programSettings.snap_height_half),
+        #                                    self.programSettings.pixels_in_mm * (self.coord_mm[0] +
+        #                                                                         self.programSettings.snap_width_half),
+        #                                    self.programSettings.pixels_in_mm * (self.coord_mm[1] +
+        #                                                                         self.programSettings.snap_height_half))
 
         # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
         # self.lbl_img.repaint()
         self.operation_status = 'init'
         self.server_status = 'init'
-        return snap
 
     def server_check(self):
         pass
