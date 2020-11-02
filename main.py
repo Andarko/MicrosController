@@ -61,8 +61,12 @@ class MainWindow(QMainWindow):
         self.path_for_xml_file = os.path.join(self.dir_for_img, "settings.xml")
 
         self.programSettings = ProgramSettings()
-        # TEST
+        # TEST Для удобства тестирования передаю в контроллер стола контроллер камеры
         self.table_controller.test = True
+        if self.table_controller.test:
+            self.table_controller.micros_controller = self.micros_controller
+            self.table_controller.programSettings = self.programSettings
+
         self.pixels_in_mm = self.programSettings.pixels_in_mm
         self.snap_width_half = self.programSettings.snap_width_half
         self.snap_height_half = self.programSettings.snap_height_half
@@ -73,7 +77,6 @@ class MainWindow(QMainWindow):
         # Наличие несохраненного изображения
         self.unsaved = False
 
-
         if self.table_controller.test:
             print("Внимание! Программа работает в тестовом режиме!")
 
@@ -81,6 +84,7 @@ class MainWindow(QMainWindow):
         self.lbl_img = QLabel()
         self.lbl_coord = QLabel("Текущие координаты:")
         self.btn_init = QPushButton("Инициализация")
+        self.btn_move_mid = QPushButton("Двигать в середину")
         self.btn_move = QPushButton("Двигать в ...")
         self.btn_manual = QPushButton("Ручной режим")
         self.edt_border_x1 = QTextEdit()
@@ -163,6 +167,9 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.btn_init)
         self.btn_move.clicked.connect(self.device_move)
         right_layout.addWidget(self.btn_move)
+        self.btn_move_mid.clicked.connect(self.device_move_mid)
+        right_layout.addWidget(self.btn_move_mid)
+
         self.btn_manual.setCheckable(True)
         self.btn_manual.setChecked(False)
         self.btn_manual.toggled["bool"].connect(self.device_manual)
@@ -262,6 +269,14 @@ class MainWindow(QMainWindow):
 
         self.control_elements_enabled(True)
 
+    def device_move_mid(self):
+        self.control_elements_enabled(False)
+        x = int(self.table_controller.limits_step[0] / self.table_controller.steps_in_mm / 2)
+        y = int(self.table_controller.limits_step[1] / self.table_controller.steps_in_mm / 2)
+        self.table_controller.coord_move([x, y, self.table_controller.coord_mm[2]])
+        self.setWindowTitle(str(self.table_controller))
+        self.control_elements_enabled(True)
+
     def device_manual(self, status):
         self.continuous_mode = status
         self.control_elements_enabled(not status)
@@ -269,6 +284,7 @@ class MainWindow(QMainWindow):
     def control_elements_enabled(self, status):
         self.btn_init.setEnabled(status)
         self.btn_move.setEnabled(status)
+        self.btn_move_mid.setEnabled(status)
         self.btn_border.setEnabled(status)
         self.btn_scan.setEnabled(status)
         self.edt_border_x1.setEnabled(status)
@@ -826,6 +842,8 @@ class TableController:
         self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
         # Режим тестирования - без работы с установкой
         self.test: bool
+        self.micros_controller: MicrosController = None
+        self.programSettings: ProgramSettings = None
 
     def __repr__(self):
         return "coord = " + str(self.coord_mm) + "; server status = " + self.server_status \
@@ -920,13 +938,17 @@ class TableController:
                 self.coord_step[1] = self.coord_mm[1] * self.steps_in_mm
                 self.coord_step[2] = self.coord_mm[2] * self.steps_in_mm
 
-        snap = self.micros_controller.snap(self.pixels_in_mm * (self.coord_mm[0] - self.snap_width_half),
-                                           self.pixels_in_mm * (self.coord_mm[1] - self.snap_height_half),
-                                           self.pixels_in_mm * (self.coord_mm[0] + self.snap_width_half),
-                                           self.pixels_in_mm * (self.coord_mm[1] + self.snap_height_half))
+        snap = self.micros_controller.snap(self.programSettings.pixels_in_mm * (self.coord_mm[0] -
+                                                                                self.programSettings.snap_width_half),
+                                           self.programSettings.pixels_in_mm * (self.coord_mm[1] -
+                                                                                self.programSettings.snap_height_half),
+                                           self.programSettings.pixels_in_mm * (self.coord_mm[0] +
+                                                                                self.programSettings.snap_width_half),
+                                           self.programSettings.pixels_in_mm * (self.coord_mm[1] +
+                                                                                self.programSettings.snap_height_half))
 
-        self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-        self.lbl_img.repaint()
+        # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+        # self.lbl_img.repaint()
         self.operation_status = 'init'
         self.server_status = 'init'
         return snap
