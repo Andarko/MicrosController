@@ -235,6 +235,7 @@ class MainWindow(QMainWindow):
         self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
         self.lbl_img.repaint()
         self.setWindowTitle(str(self.table_controller))
+        return snap
 
     def closeEvent(self, event):
         if self.unsaved:
@@ -404,7 +405,7 @@ class MainWindow(QMainWindow):
                             y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
                             all_x.append(x)
                             all_y.append(y)
-                            self.coord_move([x, y, self.snap_height], mode="discrete")
+                            snap = self.coord_move([x, y, self.snap_height], mode="discrete")
                             # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                             #                                    self.pixels_in_mm * (y - self.snap_height_half),
                             #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -426,7 +427,7 @@ class MainWindow(QMainWindow):
                         y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
                         all_x.append(x)
                         all_y.append(y)
-                        self.coord_move([x, y, self.snap_height], mode="discrete")
+                        snap = self.coord_move([x, y, self.snap_height], mode="discrete")
                         # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                         #                                    self.pixels_in_mm * (y - self.snap_height_half),
                         #                                    self.pixels_in_mm * (x + self.snap_width_half),
