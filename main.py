@@ -253,7 +253,7 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def services_menu_action_settings_click(self):
-        settings_dialog = SettingsDialog()
+        settings_dialog = SettingsDialog(self.programSettings)
         settings_dialog.setAttribute(Qt.WA_DeleteOnClose)
         settings_dialog.exec()
 
@@ -554,10 +554,10 @@ class MainWindow(QMainWindow):
             elif dlg_result == QMessageBox.Cancel:
                 return
         try:
-            x1 = int(self.edt_border_x1.toPlainText())
-            y1 = int(self.edt_border_y1.toPlainText())
-            x2 = int(self.edt_border_x2.toPlainText())
-            y2 = int(self.edt_border_y2.toPlainText())
+            x1 = float(self.edt_border_x1.toPlainText())
+            y1 = float(self.edt_border_y1.toPlainText())
+            x2 = float(self.edt_border_x2.toPlainText())
+            y2 = float(self.edt_border_y2.toPlainText())
         except ValueError:
             print("Неверный формат данных")
             return
@@ -565,20 +565,27 @@ class MainWindow(QMainWindow):
         if self.table_controller.server_status == 'uninitialized':
             self.table_controller.coord_init()
 
-        overage_x = x2 - x1 - self.snap_width * int((x2 - x1) / self.snap_width)
-        deficit_x = 0
-        if overage_x > 0:
-            deficit_x = self.snap_width - overage_x
+        # Определяем на сколько мм выступает все поле съемки из целого числа кадров
+        # x_overage = x2 - x1 - self.snap_width * int((x2 - x1) / self.snap_width)
+        x_overage = (x2 - x1) % self.snap_width
+        x_count = int((x2 - x1) // self.snap_width) + 1
+        x_deficit = 0
+        if x_overage > 0:
+            # А это - сколько надо добавить к полю съемки, чтобы получилось целое число кадров
+            x_deficit = self.snap_width - x_overage
+            x_count += 1
+            x2 += x_deficit / 2
+            x1 -= x_deficit / 2
 
-        x2 += int(deficit_x / 2)
-        x1 -= deficit_x - int(deficit_x / 2)
-
-        overage_y = y2 - y1 - self.snap_height * int((y2 - y1) / self.snap_height)
-        deficit_y = 0
-        if overage_y > 0:
-            deficit_y = self.snap_height - overage_y
-        y2 += int(deficit_y / 2)
-        y1 -= deficit_y - int(deficit_y / 2)
+        # y_overage = y2 - y1 - self.snap_height * int((y2 - y1) / self.snap_height)
+        y_overage = (y2 - y1) % self.snap_height
+        y_count = int((y2 - y1) // self.snap_height + 1)
+        y_deficit = 0
+        if y_overage > 0:
+            y_deficit = self.snap_height - y_overage
+            y_count += 1
+            y2 += y_deficit / 2
+            y1 -= y_deficit / 2
         print("x1={0}; y1={1}; x2={2}; y2={3}".format(x1, y1, x2, y2))
         # Работа с директорией для сохранения изображений
         # shutil.rmtree(self.dir_for_img)
@@ -588,48 +595,74 @@ class MainWindow(QMainWindow):
             os.remove(os.path.join(self.dir_for_img, file))
         # Получение и сохранение изображений в директорию
         left_dir = abs(self.table_controller.coord_mm[0] - x1) > abs(self.table_controller.coord_mm[0] - x2)
-        # выбираем обход изображения, исходя из того - ближе мы к его верху или низу
-        y_start = y1
-        y_finish = y2 + 1
-        y_delta = self.snap_height
-        j = int((y2 - y1) / self.snap_height) + 1
-        d_j = -1
-        if abs(self.table_controller.coord_mm[1] - y1) > abs(self.table_controller.coord_mm[1] - y2):
-            y_start = y2
-            y_finish = y1 - 1
-            y_delta = -self.snap_height
-            j = 1
-            d_j = 1
 
-        for y in range(y_start, y_finish, y_delta):
+        # выбираем обход изображения, исходя из того - ближе мы к его верху или низу
+        j_start = 0
+        j_finish = y_count
+        j_delta = 1
+        if abs(self.table_controller.coord_mm[1] - y1) > abs(self.table_controller.coord_mm[1] - y2):
+            j_start = y_count - 1
+            j_finish = -1
+            j_delta = -1
+
+        for j in range(j_start, j_finish, j_delta):
+            y = y1 + j * self.snap_height
+            # В проге просмотра ось y вернута вниз
+            j_r = y_count - 1 - j
             if left_dir:
-                i = int((x2 - x1) / self.snap_width) + 1
-                for x in range(x2, x1 - 1, -self.snap_width):
-                    snap = self.coord_move([x, y, self.snap_height], mode="discrete")
-                    # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                    #                                    self.pixels_in_mm * (y - self.snap_height_half),
-                    #                                    self.pixels_in_mm * (x + self.snap_width_half),
-                    #                                    self.pixels_in_mm * (y + self.snap_height_half))
-                    # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-                    # self.lbl_img.repaint()
-                    cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
-                    print('x = ' + str(x) + '; y = ' + str(y))
-                    i -= 1
+                x_range = range(x_count - 1, -1, -1)
             else:
-                i = 0
-                for x in range(x1, x2 + 1, self.snap_width):
-                    i += 1
-                    snap = self.coord_move([x, y, self.snap_height], mode="discrete")
-                    # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
-                    #                                    self.pixels_in_mm * (y - self.snap_height_half),
-                    #                                    self.pixels_in_mm * (x + self.snap_width_half),
-                    #                                    self.pixels_in_mm * (y + self.snap_height_half))
-                    # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-                    # self.lbl_img.repaint()
-                    cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
-                    print('x = ' + str(x) + '; y = ' + str(y))
+                x_range = range(0, x_count, 1)
+            for i in x_range:
+                x = x1 + i * self.snap_width
+                snap = self.coord_move([x, y, self.snap_height], mode="discrete")
+                cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j_r + 1, i + 1)), snap[:, :, ::-1])
+                print('x = ' + str(x) + '; y = ' + str(y))
+
             left_dir = not left_dir
-            j += d_j
+
+        # выбираем обход изображения, исходя из того - ближе мы к его верху или низу
+        # y_start = y1
+        # y_finish = y2 + 1
+        # y_delta = self.snap_height
+        # j = int((y2 - y1) / self.snap_height) + 1
+        # d_j = -1
+        # if abs(self.table_controller.coord_mm[1] - y1) > abs(self.table_controller.coord_mm[1] - y2):
+        #     y_start = y2
+        #     y_finish = y1 - 1
+        #     y_delta = -self.snap_height
+        #     j = 1
+        #     d_j = 1
+
+        # for y in range(y_start, y_finish, y_delta):
+        #     if left_dir:
+        #         i = int((x2 - x1) / self.snap_width) + 1
+        #         for x in range(x2, x1 - 1, -self.snap_width):
+        #             snap = self.coord_move([x, y, self.snap_height], mode="discrete")
+        #             # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+        #             #                                    self.pixels_in_mm * (y - self.snap_height_half),
+        #             #                                    self.pixels_in_mm * (x + self.snap_width_half),
+        #             #                                    self.pixels_in_mm * (y + self.snap_height_half))
+        #             # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+        #             # self.lbl_img.repaint()
+        #             cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
+        #             print('x = ' + str(x) + '; y = ' + str(y))
+        #             i -= 1
+        #     else:
+        #         i = 0
+        #         for x in range(x1, x2 + 1, self.snap_width):
+        #             i += 1
+        #             snap = self.coord_move([x, y, self.snap_height], mode="discrete")
+        #             # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
+        #             #                                    self.pixels_in_mm * (y - self.snap_height_half),
+        #             #                                    self.pixels_in_mm * (x + self.snap_width_half),
+        #             #                                    self.pixels_in_mm * (y + self.snap_height_half))
+        #             # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+        #             # self.lbl_img.repaint()
+        #             cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j, i)), snap[:, :, ::-1])
+        #             print('x = ' + str(x) + '; y = ' + str(y))
+        #     left_dir = not left_dir
+        #     j += d_j
 
         # Создание файла описания XML
         root = Xml.Element("Root")
@@ -645,18 +678,18 @@ class MainWindow(QMainWindow):
         img_format.text = "jpg"
         img_size = Xml.SubElement(elem_img, "ImgSize")
         img_size_width = Xml.SubElement(img_size, "Width")
-        img_size_width.text = str(self.snap_width * self.pixels_in_mm)
+        img_size_width.text = str(int(self.snap_width * self.pixels_in_mm))
         img_size_height = Xml.SubElement(img_size, "Height")
-        img_size_height.text = str(self.snap_height * self.pixels_in_mm)
+        img_size_height.text = str(int(self.snap_height * self.pixels_in_mm))
         img_con_area = Xml.SubElement(elem_img, "ConnectionArea")
         ica_x = Xml.SubElement(img_con_area, "X")
         ica_x.text = str(0)
         ica_y = Xml.SubElement(img_con_area, "Y")
         ica_y.text = str(0)
         ica_width = Xml.SubElement(img_con_area, "Width")
-        ica_width.text = str(self.snap_width * self.pixels_in_mm)
+        ica_width.text = str(int(self.snap_width * self.pixels_in_mm))
         ica_height = Xml.SubElement(img_con_area, "Height")
-        ica_height.text = str(self.snap_height * self.pixels_in_mm)
+        ica_height.text = str(int(self.snap_height * self.pixels_in_mm))
 
         tree = Xml.ElementTree(root)
         with open(self.path_for_xml_file, "w") as f_obj:
