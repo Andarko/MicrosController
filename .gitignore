@@ -130,7 +130,7 @@ dmypy.json
 .pyre/
 
 #odt
-.~lock.
+.~lock*.odt#
 TEST
 SavedImg
 test.txt

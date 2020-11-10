@@ -60,16 +60,16 @@ class MainWindow(QMainWindow):
         self.dir_for_img = "SavedImg"
         self.path_for_xml_file = os.path.join(self.dir_for_img, "settings.xml")
 
-        self.programSettings = ProgramSettings()
+        self.program_settings = ProgramSettings()
         # TEST Для удобства тестирования передаю в контроллер стола контроллер камеры
         self.table_controller.test = True
-        if self.table_controller.test:
-            self.table_controller.micros_controller = self.micros_controller
-            self.table_controller.programSettings = self.programSettings
+        # if self.table_controller.test:
+        #     self.table_controller.micros_controller = self.micros_controller
+        #     self.table_controller.program_settings = self.program_settings
 
-        self.pixels_in_mm = self.programSettings.pixels_in_mm
-        self.snap_width_half = self.programSettings.snap_width_half
-        self.snap_height_half = self.programSettings.snap_height_half
+        self.pixels_in_mm = self.program_settings.pixels_in_mm
+        self.snap_width_half = self.program_settings.snap_width_half
+        self.snap_height_half = self.program_settings.snap_height_half
         self.snap_width = 2 * self.snap_width_half
         self.snap_height = 2 * self.snap_height_half
         self.delta_x = int(self.snap_width_half * self.pixels_in_mm / 5)
@@ -251,9 +251,8 @@ class MainWindow(QMainWindow):
                 event.ignore()
         self.closed = True
 
-    @staticmethod
     def services_menu_action_settings_click(self):
-        settings_dialog = SettingsDialog(self.programSettings)
+        settings_dialog = SettingsDialog(self.program_settings)
         settings_dialog.setAttribute(Qt.WA_DeleteOnClose)
         settings_dialog.exec()
 
