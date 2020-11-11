@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
 
         self.program_settings = ProgramSettings()
         # TEST Для удобства тестирования передаю в контроллер стола контроллер камеры
-        self.table_controller.test = True
+        self.table_controller.test = False
         # if self.table_controller.test:
         #     self.table_controller.micros_controller = self.micros_controller
         #     self.table_controller.program_settings = self.program_settings
@@ -224,18 +224,20 @@ class MainWindow(QMainWindow):
     # Тестовая обертка функции движения, чтобы обходиться без подключенного станка
     def coord_move(self, coord, mode="discrete"):
         self.table_controller.coord_move(coord, mode)
-        snap = self.micros_controller.snap(int(self.pixels_in_mm * (self.table_controller.coord_mm[0]
-                                                                    - self.snap_width_half)),
-                                           int(self.pixels_in_mm * (self.table_controller.coord_mm[1]
-                                                                    - self.snap_height_half)),
-                                           int(self.pixels_in_mm * (self.table_controller.coord_mm[0]
-                                                                    + self.snap_width_half)),
-                                           int(self.pixels_in_mm * (self.table_controller.coord_mm[1]
-                                                                    + self.snap_height_half)))
-        self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
-        self.lbl_img.repaint()
-        self.setWindowTitle(str(self.table_controller))
-        return snap
+        if self.table_controller.test or mode != "continuous":
+            snap = self.micros_controller.snap(int(self.pixels_in_mm * (self.table_controller.coord_mm[0]
+                                                                        - self.snap_width_half)),
+                                               int(self.pixels_in_mm * (self.table_controller.coord_mm[1]
+                                                                        - self.snap_height_half)),
+                                               int(self.pixels_in_mm * (self.table_controller.coord_mm[0]
+                                                                        + self.snap_width_half)),
+                                               int(self.pixels_in_mm * (self.table_controller.coord_mm[1]
+                                                                        + self.snap_height_half)))
+            self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
+            self.lbl_img.repaint()
+            self.setWindowTitle(str(self.table_controller))
+            return snap
+        return None
 
     def closeEvent(self, event):
         if self.unsaved:
@@ -971,7 +973,7 @@ class TableController:
                 dy = coord[1]
                 dz = coord[2]
             # loop = asyncio.get_event_loop()
-            data = self.get_request(x_step=dx, y_step=dy, z_step=dz, mode=mode)
+            data = self.get_request(x_step=int(dx), y_step=int(dy), z_step=int(dz), mode=mode)
             result = self.loop.run_until_complete(self.produce(message=data, host=self.hostname, port=self.port))
             f = open('test.txt', 'a')
             now = datetime.datetime.now()

@@ -37,7 +37,7 @@ class Server:
 
         self.SENSOR = [23, 24, 26]
 
-        # print("init succsess")
+        # print("init success")
 
     async def register(self, ws: WebSocketServerProtocol) -> None:
         self.clients.add(ws)
@@ -84,7 +84,7 @@ class Server:
     async def init_move(self, distancex, distancey, distancez):
         directions = [await self.getdir(distancex), await self.getdir(distancey), await self.getdir(distancez)]
         distances = [abs(distancex) * 2, abs(distancey) * 2, abs(distancez) * 2]
-
+        GPIO.setmode(GPIO.BOARD)
         for i in range(3):
             GPIO.setup(self.STEPPLUS[i], GPIO.OUT)
             GPIO.setup(self.STEPMINUS[i], GPIO.OUT)

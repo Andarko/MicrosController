@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QDialog, QComboBox, QVBoxLayout, QLabel, QWidget, QHBoxLayout, QPushButton
+from PyQt5.QtWidgets import QDialog, QComboBox, QVBoxLayout, QLabel, QWidget, QHBoxLayout, QPushButton, QInputDialog, \
+    QLineEdit, QMessageBox
 from PyQt5.QtCore import Qt
 import configparser
 
@@ -26,6 +27,7 @@ class SettingsDialog(QDialog):
 
     # Создание элементов формы
     def init_ui(self):
+        self.setMinimumWidth(640)
         main_layout = QVBoxLayout()
 
         micros_lbl = QLabel("Выбранный микроскоп")
@@ -39,12 +41,15 @@ class SettingsDialog(QDialog):
         self.combo_micros.currentIndexChanged.connect(self.combo_micros_changed)
         micros_layout.addWidget(self.combo_micros)
         micros_btn_add = QPushButton("Добавить")
+        micros_btn_add.setMaximumWidth(80)
         micros_btn_add.clicked.connect(self.micros_btn_add_click)
         micros_layout.addWidget(micros_btn_add)
         micros_edt_add = QPushButton("Изменить")
+        micros_edt_add.setMaximumWidth(80)
         micros_edt_add.clicked.connect(self.micros_btn_edt_click)
         micros_layout.addWidget(micros_edt_add)
         micros_del_add = QPushButton("Удалить")
+        micros_del_add.setMaximumWidth(80)
         micros_del_add.clicked.connect(self.micros_btn_del_click)
         micros_layout.addWidget(micros_del_add)
         main_layout.addLayout(micros_layout)
@@ -55,10 +60,37 @@ class SettingsDialog(QDialog):
         print(self.combo_micros.currentText())
 
     def micros_btn_add_click(self):
-        pass
+        input_dialog = QInputDialog()
+        text, ok = input_dialog.getText(self, "Добавление камеры", "Наименование", QLineEdit.Normal)
+
+        if ok:
+            self.combo_micros.addItem(text)
+            self.combo_micros.setCurrentIndex(self.combo_micros.count() - 1)
 
     def micros_btn_edt_click(self):
-        pass
+        if self.combo_micros.count() == 0:
+            return
+        input_dialog = QInputDialog()
+        text, ok = input_dialog.getText(self,
+                                        "Переименование камеры", "Наименование",
+                                        QLineEdit.Normal, self.combo_micros.currentText())
+        if ok and text:
+            i = self.combo_micros.currentIndex()
+            self.combo_micros.removeItem(self.combo_micros.currentIndex())
+            self.combo_micros.insertItem(i, text)
+            self.combo_micros.setCurrentIndex(i)
 
     def micros_btn_del_click(self):
-        pass
+        if self.combo_micros.count() == 0:
+            return
+        dlg_result = QMessageBox.question(self,
+                                          "Confirm Dialog",
+                                          "Вы действительно хотите удалить камеру со всеми настройками?",
+                                          QMessageBox.Yes | QMessageBox.No,
+                                          QMessageBox.No)
+        if dlg_result == QMessageBox.Yes:
+            input_dialog = QInputDialog()
+            text, ok = input_dialog.getText(self, "Удаление камеры",
+                                            "Для удаления напишите \"удалить\"", QLineEdit.Normal)
+            if ok and str.lower(text) == "удалить":
+                self.combo_micros.removeItem(self.combo_micros.currentIndex())
