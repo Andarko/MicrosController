@@ -1,7 +1,12 @@
-from PyQt5.QtWidgets import QDialog, QComboBox, QVBoxLayout, QLabel, QWidget, QHBoxLayout, QPushButton, QInputDialog, \
-    QLineEdit, QMessageBox
-from PyQt5.QtCore import Qt
-import configparser
+from PyQt5.QtWidgets import QDialog, QComboBox, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QInputDialog, \
+    QLineEdit, QMessageBox, QSplitter, QFrame
+from PyQt5.QtCore import Qt, QSize
+
+
+class MicrosSettings(object):
+    def __init__(self):
+        self.name: str
+        self.resolution: QSize
 
 
 class ShotSetting(object):
@@ -13,6 +18,7 @@ class ShotSetting(object):
 
 class ProgramSettings(object):
     def __init__(self):
+        self.micros_settings: MicrosSettings()
         self.pixels_in_mm = 10.0
         self.snap_width_half = 10.0
         self.snap_height_half = 5.0
@@ -21,7 +27,7 @@ class ProgramSettings(object):
 class SettingsDialog(QDialog):
     def __init__(self, program_settings: ProgramSettings()):
         super().__init__()
-
+        self.all_micros_settings = list()
         self.combo_micros = QComboBox()
         self.init_ui()
 
@@ -34,7 +40,7 @@ class SettingsDialog(QDialog):
         micros_lbl.setAlignment(Qt.AlignHCenter)
         font_title = micros_lbl.font()
         font_title.setBold(True)
-        font_title.setPixelSize(18)
+        font_title.setPixelSize(16)
         micros_lbl.setFont(font_title)
         main_layout.addWidget(micros_lbl)
         micros_layout = QHBoxLayout()
@@ -53,6 +59,12 @@ class SettingsDialog(QDialog):
         micros_del_add.clicked.connect(self.micros_btn_del_click)
         micros_layout.addWidget(micros_del_add)
         main_layout.addLayout(micros_layout)
+
+        splitter = QSplitter(Qt.Horizontal)
+        
+        main_layout.addWidget(splitter)
+
+        main_layout.addWidget(QPushButton("ОК"))
 
         self.setLayout(main_layout)
 

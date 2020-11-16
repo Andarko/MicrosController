@@ -1,0 +1,32 @@
+<Settings>
+	<AllMicros>
+		<Micros name = "Микроскоп 1">
+			<Resolution>
+				<Width>1024</Width>
+				<Height>768</Height>
+			</Resolution>
+			<Default>False</Default>
+		</Micros>
+		<Micros name = "Микроскоп 1">
+			<Resolution>
+				<Width>640</Width>
+				<Height>480</Height>
+			</Resolution>
+			<Default>False</Default>
+		</Micros>
+		<Micros name = "Микроскоп 2">
+			<Resolution>
+				<Width>4096</Width>
+				<Height>2048</Height>
+			</Resolution>
+			<Default>False</Default>
+		</Micros>
+		<Micros name = "Микроскоп тест">
+			<Resolution>
+				<Width>200</Width>
+				<Height>100</Height>
+			</Resolution>
+			<Default>False</Default>
+		</Micros>
+	</AllMicros>
+</Settings>

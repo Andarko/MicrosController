@@ -38,8 +38,13 @@ class MainWindow(QMainWindow):
 
         # self.micros_controller = TableController('localhost', 5001)
         self.loop = asyncio.get_event_loop()
-        self.table_controller = TableController(self.loop)
         self.micros_controller = MicrosController()
+        self.table_controller = TableController(self.loop)
+        # TEST Для удобства тестирования передаю в контроллер стола контроллер камеры
+        self.table_controller.test = False
+        # if self.table_controller.test:
+        #     self.table_controller.micros_controller = self.micros_controller
+        #     self.table_controller.program_settings = self.program_settings
 
         if not self.table_controller.thread_server or not self.table_controller.thread_server.is_alive():
             self.table_controller.thread_server.start()
@@ -61,11 +66,6 @@ class MainWindow(QMainWindow):
         self.path_for_xml_file = os.path.join(self.dir_for_img, "settings.xml")
 
         self.program_settings = ProgramSettings()
-        # TEST Для удобства тестирования передаю в контроллер стола контроллер камеры
-        self.table_controller.test = False
-        # if self.table_controller.test:
-        #     self.table_controller.micros_controller = self.micros_controller
-        #     self.table_controller.program_settings = self.program_settings
 
         self.pixels_in_mm = self.program_settings.pixels_in_mm
         self.snap_width_half = self.program_settings.snap_width_half
@@ -365,7 +365,6 @@ class MainWindow(QMainWindow):
             # Направления для поиска краев
             direction_sequence = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0], [0, 1]]
             previous_direction = None
-            in_border = False
 
             for direction in direction_sequence:
                 # Берем следующий фрейм до тех пор, пока не выйдем за границу изделтя
@@ -570,7 +569,6 @@ class MainWindow(QMainWindow):
         # x_overage = x2 - x1 - self.snap_width * int((x2 - x1) / self.snap_width)
         x_overage = (x2 - x1) % self.snap_width
         x_count = int((x2 - x1) // self.snap_width) + 1
-        x_deficit = 0
         if x_overage > 0:
             # А это - сколько надо добавить к полю съемки, чтобы получилось целое число кадров
             x_deficit = self.snap_width - x_overage
@@ -581,7 +579,6 @@ class MainWindow(QMainWindow):
         # y_overage = y2 - y1 - self.snap_height * int((y2 - y1) / self.snap_height)
         y_overage = (y2 - y1) % self.snap_height
         y_count = int((y2 - y1) // self.snap_height + 1)
-        y_deficit = 0
         if y_overage > 0:
             y_deficit = self.snap_height - y_overage
             y_count += 1
@@ -693,7 +690,7 @@ class MainWindow(QMainWindow):
         ica_height.text = str(int(self.snap_height * self.pixels_in_mm))
 
         tree = Xml.ElementTree(root)
-        with open(self.path_for_xml_file, "w") as f_obj:
+        with open(self.path_for_xml_file, "w"):
             tree.write(self.path_for_xml_file)
         self.btn_save_scan.setEnabled(True)
         QMessageBox.information(self, "Info Dialog", "Сканирование завершено", QMessageBox.Ok, QMessageBox.Ok)
@@ -847,7 +844,7 @@ class MicrosController:
                 elif image.shape[2] == 4:
                     height, width, channels = image.shape
                     bytes_per_line = channels * width
-                    fmt = QImage.Format_ARGB32
+                    # fmt = QImage.Format_ARGB32
                     q_img = QImage(
                         image.data, width, height, bytes_per_line, QImage.Format_ARGB32
                     )
@@ -1028,11 +1025,11 @@ class TableController:
     def init(self):
         return self.send_json_request("init request")
 
-    # функция отправки json для управления станком
-    @staticmethod
-    def send_json_request(json_request):
-        answer = "ok"
-        return answer
+    # # функция отправки json для управления станком
+    # @staticmethod
+    # def send_json_request(json_request):
+    #     answer = "ok"
+    #     return answer
 
 
 # Press the green button in the gutter to run the script.
@@ -1042,4 +1039,3 @@ if __name__ == '__main__':
     sys.exit(app.exec_())
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
-
