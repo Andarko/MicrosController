@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QDialog, QComboBox, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QInputDialog, \
-    QLineEdit, QMessageBox, QSplitter, QFrame
+    QLineEdit, QMessageBox, QSplitter, QFrame, QFormLayout, QDoubleSpinBox, QSpinBox
 from PyQt5.QtCore import Qt, QSize
 
 
@@ -29,49 +29,112 @@ class SettingsDialog(QDialog):
         super().__init__()
         self.all_micros_settings = list()
         self.combo_micros = QComboBox()
+        self.combo_set_micro = QComboBox()
+        self.edt_res_width = QSpinBox()
+        self.edt_res_height = QSpinBox()
+        self.edt_offset_left = QSpinBox()
+        self.edt_offset_right = QSpinBox()
+        self.edt_offset_top = QSpinBox()
+        self.edt_offset_bottom = QSpinBox()
+        self.edt_pixels_in_mm = QDoubleSpinBox()
+        self.edt_work_height = QDoubleSpinBox()
+        self.edt_focus = QLineEdit()
+        self.edt_zoom_ratio = QLineEdit()
         self.init_ui()
 
     # Создание элементов формы
     def init_ui(self):
-        self.setMinimumWidth(640)
-        main_layout = QVBoxLayout()
+        self.setMinimumWidth(480)
+        layout_main = QVBoxLayout()
 
-        micros_lbl = QLabel("Выбранный микроскоп")
-        micros_lbl.setAlignment(Qt.AlignHCenter)
-        font_title = micros_lbl.font()
+        lbl_micros = QLabel("Выбранная камера")
+        # lbl_micros.setAlignment(Qt.AlignHCenter)
+        font_title = lbl_micros.font()
         font_title.setBold(True)
         font_title.setPixelSize(16)
-        micros_lbl.setFont(font_title)
-        main_layout.addWidget(micros_lbl)
-        micros_layout = QHBoxLayout()
+        lbl_micros.setFont(font_title)
+        layout_main.addWidget(lbl_micros)
+        layout_micros = QHBoxLayout()
         self.combo_micros.currentIndexChanged.connect(self.combo_micros_changed)
-        micros_layout.addWidget(self.combo_micros)
-        micros_btn_add = QPushButton("Добавить")
-        micros_btn_add.setMaximumWidth(80)
-        micros_btn_add.clicked.connect(self.micros_btn_add_click)
-        micros_layout.addWidget(micros_btn_add)
-        micros_edt_add = QPushButton("Изменить")
-        micros_edt_add.setMaximumWidth(80)
-        micros_edt_add.clicked.connect(self.micros_btn_edt_click)
-        micros_layout.addWidget(micros_edt_add)
-        micros_del_add = QPushButton("Удалить")
-        micros_del_add.setMaximumWidth(80)
-        micros_del_add.clicked.connect(self.micros_btn_del_click)
-        micros_layout.addWidget(micros_del_add)
-        main_layout.addLayout(micros_layout)
+        layout_micros.addWidget(self.combo_micros)
+        btn_micros_add = QPushButton("Добавить")
+        btn_micros_add.setMaximumWidth(80)
+        btn_micros_add.clicked.connect(self.btn_micros_add_click)
+        layout_micros.addWidget(btn_micros_add)
+        btn_micros_edt = QPushButton("Изменить")
+        btn_micros_edt.setMaximumWidth(80)
+        btn_micros_edt.clicked.connect(self.btn_micros_edt_click)
+        layout_micros.addWidget(btn_micros_edt)
+        btn_micros_del = QPushButton("Удалить")
+        btn_micros_del.setMaximumWidth(80)
+        btn_micros_del.clicked.connect(self.btn_micros_del_click)
+        layout_micros.addWidget(btn_micros_del)
+        layout_main.addLayout(layout_micros)
 
-        splitter = QSplitter(Qt.Horizontal)
-        
-        main_layout.addWidget(splitter)
+        for edt_px in [self.edt_res_width, self.edt_res_height, self.edt_offset_left, self.edt_offset_right,
+                       self.edt_offset_top, self.edt_offset_bottom]:
+            edt_px.setMinimum(0)
+            edt_px.setMaximum(40000)
+            edt_px.setSuffix(" px")
 
-        main_layout.addWidget(QPushButton("ОК"))
+        lbl_resolution = QLabel("Разрешение")
+        lbl_resolution.setFont(font_title)
+        layout_main.addWidget(lbl_resolution)
+        layout_resolution = QHBoxLayout()
+        layout_resolution.addWidget(QLabel("Ширина"))
+        self.edt_res_width.setValue(1024)
+        self.edt_res_width.setMinimum(20)
+        layout_resolution.addWidget(self.edt_res_width)
+        layout_resolution.addWidget(QLabel("Высота"))
+        self.edt_res_height.setValue(768)
+        self.edt_res_height.setMinimum(10)
+        layout_resolution.addWidget(self.edt_res_height)
+        layout_main.addLayout(layout_resolution)
 
-        self.setLayout(main_layout)
+        lbl_set_micro = QLabel("Режимы съемки")
+        lbl_set_micro.setFont(font_title)
+        layout_main.addWidget(lbl_set_micro)
+        layout_set_micro = QHBoxLayout()
+        self.combo_set_micro.currentIndexChanged.connect(self.combo_set_micro_changed)
+        layout_set_micro.addWidget(self.combo_set_micro)
+        btn_set_micro_add = QPushButton("Добавить")
+        btn_set_micro_add.setMaximumWidth(80)
+        btn_set_micro_add.clicked.connect(self.btn_set_micro_add_click)
+        layout_set_micro.addWidget(btn_set_micro_add)
+        btn_set_micro_edt = QPushButton("Изменить")
+        btn_set_micro_edt.setMaximumWidth(80)
+        btn_set_micro_edt.clicked.connect(self.btn_set_micro_edt_click)
+        layout_set_micro.addWidget(btn_set_micro_edt)
+        btn_set_micro_del = QPushButton("Удалить")
+        btn_set_micro_del.setMaximumWidth(80)
+        btn_set_micro_del.clicked.connect(self.btn_set_micro_del_click)
+        layout_set_micro.addWidget(btn_set_micro_del)
+        layout_main.addLayout(layout_set_micro)
+
+        layout_offset = QFormLayout()
+        layout_offset.addRow(QLabel("Размер отступа слева"), self.edt_offset_left)
+        layout_offset.addRow(QLabel("Размер отступа справа"), self.edt_offset_right)
+        layout_offset.addRow(QLabel("Размер отступа сверху"), self.edt_offset_top)
+        layout_offset.addRow(QLabel("Размер отступа снизу"), self.edt_offset_bottom)
+
+        layout_offset.addRow(QLabel("Пикселей на мм"), self.edt_pixels_in_mm)
+        layout_offset.addRow(QLabel("Высота работы камеры, мм"), self.edt_work_height)
+        layout_offset.addRow(QLabel("Фокус"), self.edt_focus)
+        layout_offset.addRow(QLabel("Увеличение"), self.edt_zoom_ratio)
+
+        layout_main.addLayout(layout_offset)
+
+        layout_main.addWidget(QPushButton("ОК"))
+
+        self.setLayout(layout_main)
 
     def combo_micros_changed(self):
         print(self.combo_micros.currentText())
 
-    def micros_btn_add_click(self):
+    def combo_set_micro_changed(self):
+        print(self.combo_set_micro.currentText())
+
+    def btn_micros_add_click(self):
         input_dialog = QInputDialog()
         text, ok = input_dialog.getText(self, "Добавление камеры", "Наименование", QLineEdit.Normal)
 
@@ -79,7 +142,7 @@ class SettingsDialog(QDialog):
             self.combo_micros.addItem(text)
             self.combo_micros.setCurrentIndex(self.combo_micros.count() - 1)
 
-    def micros_btn_edt_click(self):
+    def btn_micros_edt_click(self):
         if self.combo_micros.count() == 0:
             return
         input_dialog = QInputDialog()
@@ -92,12 +155,12 @@ class SettingsDialog(QDialog):
             self.combo_micros.insertItem(i, text)
             self.combo_micros.setCurrentIndex(i)
 
-    def micros_btn_del_click(self):
+    def btn_micros_del_click(self):
         if self.combo_micros.count() == 0:
             return
         dlg_result = QMessageBox.question(self,
                                           "Confirm Dialog",
-                                          "Вы действительно хотите удалить камеру со всеми настройками?",
+                                          "Вы действительно хотите удалить выбранную камеру со всеми настройками?",
                                           QMessageBox.Yes | QMessageBox.No,
                                           QMessageBox.No)
         if dlg_result == QMessageBox.Yes:
@@ -106,3 +169,39 @@ class SettingsDialog(QDialog):
                                             "Для удаления напишите \"удалить\"", QLineEdit.Normal)
             if ok and str.lower(text) == "удалить":
                 self.combo_micros.removeItem(self.combo_micros.currentIndex())
+
+    def btn_set_micro_add_click(self):
+        input_dialog = QInputDialog()
+        text, ok = input_dialog.getText(self, "Добавление настройки", "Наименование", QLineEdit.Normal)
+
+        if ok:
+            self.combo_set_micro.addItem(text)
+            self.combo_set_micro.setCurrentIndex(self.combo_set_micro.count() - 1)
+
+    def btn_set_micro_edt_click(self):
+        if self.combo_set_micro.count() == 0:
+            return
+        input_dialog = QInputDialog()
+        text, ok = input_dialog.getText(self,
+                                        "Переименование настройки", "Наименование",
+                                        QLineEdit.Normal, self.combo_set_micro.currentText())
+        if ok and text:
+            i = self.combo_set_micro.currentIndex()
+            self.combo_set_micro.removeItem(self.combo_set_micro.currentIndex())
+            self.combo_set_micro.insertItem(i, text)
+            self.combo_set_micro.setCurrentIndex(i)
+
+    def btn_set_micro_del_click(self):
+        if self.combo_set_micro.count() == 0:
+            return
+        dlg_result = QMessageBox.question(self,
+                                          "Confirm Dialog",
+                                          "Вы действительно хотите удалить выбранную настройку полностью?",
+                                          QMessageBox.Yes | QMessageBox.No,
+                                          QMessageBox.No)
+        if dlg_result == QMessageBox.Yes:
+            input_dialog = QInputDialog()
+            text, ok = input_dialog.getText(self, "Удаление настройки",
+                                            "Для удаления напишите \"удалить\"", QLineEdit.Normal)
+            if ok and str.lower(text) == "удалить":
+                self.combo_set_micro.removeItem(self.combo_set_micro.currentIndex())
