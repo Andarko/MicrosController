@@ -1,10 +1,30 @@
 <Settings>
+	<Table>
+		<StepsInMM>80</StepsInMM>
+		<LimitsMM>
+			<X>340</X>
+			<Y>640</Y>
+			<Z>70</Z>
+		</LimitsMM>
+	</Table>
 	<AllMicros>
 		<Micros name = "Микроскоп_1 800к">
 			<Resolution>
 				<Width>1024</Width>
 				<Height>768</Height>
 			</Resolution>
+			<Mode name = "Default">
+				<Offset>
+					<Left>0</Left>
+					<Right>0</Right>
+					<Top>0</Top>
+					<Bottom>0</Bottom>
+					<PixelsInMM>800</PixelsInMM>
+					<WorkHeightMM>50</WorkHeightMM>
+					<Focus>Auto</Focus>
+					<Zoom>50x</Zoom>
+				</Offset>
+			</Mode>
 		</Micros>
 		<Micros name = "Микроскоп_1 300к">
 			<Resolution>
@@ -23,6 +43,18 @@
 				<Width>200</Width>
 				<Height>100</Height>
 			</Resolution>
+			<Mode name = "Default">
+				<Offset>
+					<Left>0</Left>
+					<Right>0</Right>
+					<Top>0</Top>
+					<Bottom>0</Bottom>
+					<PixelsInMM>10</PixelsInMM>
+					<WorkHeightMM>40</WorkHeightMM>
+					<Focus>Auto</Focus>
+					<Zoom>0.1x</Zoom>
+				</Offset>
+			</Mode>
 			<Default>True</Default>
 		</Micros>
 	</AllMicros>

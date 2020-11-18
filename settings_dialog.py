@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QDialog, QComboBox, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QInputDialog, \
-    QLineEdit, QMessageBox, QSplitter, QFrame, QFormLayout, QDoubleSpinBox, QSpinBox
+    QLineEdit, QMessageBox, QFormLayout, QDoubleSpinBox, QSpinBox, QAbstractSpinBox
 from PyQt5.QtCore import Qt, QSize
+import xml.etree.ElementTree as Xml
 
 
 class MicrosSettings(object):
@@ -12,16 +13,18 @@ class MicrosSettings(object):
 class ShotSetting(object):
     def __init__(self):
         self.pixels_in_mm = 10.0
-        self.snap_width_half = 10.0
-        self.snap_height_half = 5.0
+        self.snap_width = 20.0
+        self.snap_height = 10.0
 
 
 class ProgramSettings(object):
     def __init__(self):
         self.micros_settings: MicrosSettings()
         self.pixels_in_mm = 10.0
-        self.snap_width_half = 10.0
-        self.snap_height_half = 5.0
+        self.snap_width = 20.0
+        self.snap_height = 10.0
+        self.steps_in_mm = 80
+        self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
 
 
 class SettingsDialog(QDialog):
@@ -29,7 +32,7 @@ class SettingsDialog(QDialog):
         super().__init__()
         self.all_micros_settings = list()
         self.combo_micros = QComboBox()
-        self.combo_set_micro = QComboBox()
+        self.combo_modes = QComboBox()
         self.edt_res_width = QSpinBox()
         self.edt_res_height = QSpinBox()
         self.edt_offset_left = QSpinBox()
@@ -76,6 +79,8 @@ class SettingsDialog(QDialog):
             edt_px.setMinimum(0)
             edt_px.setMaximum(40000)
             edt_px.setSuffix(" px")
+            edt_px.setButtonSymbols(QAbstractSpinBox.NoButtons)
+            edt_px.setSingleStep(0)
 
         lbl_resolution = QLabel("Разрешение")
         lbl_resolution.setFont(font_title)
@@ -84,6 +89,7 @@ class SettingsDialog(QDialog):
         layout_resolution.addWidget(QLabel("Ширина"))
         self.edt_res_width.setValue(1024)
         self.edt_res_width.setMinimum(20)
+
         layout_resolution.addWidget(self.edt_res_width)
         layout_resolution.addWidget(QLabel("Высота"))
         self.edt_res_height.setValue(768)
@@ -91,25 +97,25 @@ class SettingsDialog(QDialog):
         layout_resolution.addWidget(self.edt_res_height)
         layout_main.addLayout(layout_resolution)
 
-        lbl_set_micro = QLabel("Режимы съемки")
-        lbl_set_micro.setFont(font_title)
-        layout_main.addWidget(lbl_set_micro)
-        layout_set_micro = QHBoxLayout()
-        self.combo_set_micro.currentIndexChanged.connect(self.combo_set_micro_changed)
-        layout_set_micro.addWidget(self.combo_set_micro)
-        btn_set_micro_add = QPushButton("Добавить")
-        btn_set_micro_add.setMaximumWidth(80)
-        btn_set_micro_add.clicked.connect(self.btn_set_micro_add_click)
-        layout_set_micro.addWidget(btn_set_micro_add)
-        btn_set_micro_edt = QPushButton("Изменить")
-        btn_set_micro_edt.setMaximumWidth(80)
-        btn_set_micro_edt.clicked.connect(self.btn_set_micro_edt_click)
-        layout_set_micro.addWidget(btn_set_micro_edt)
-        btn_set_micro_del = QPushButton("Удалить")
-        btn_set_micro_del.setMaximumWidth(80)
-        btn_set_micro_del.clicked.connect(self.btn_set_micro_del_click)
-        layout_set_micro.addWidget(btn_set_micro_del)
-        layout_main.addLayout(layout_set_micro)
+        lbl_mode = QLabel("Режимы съемки")
+        lbl_mode.setFont(font_title)
+        layout_main.addWidget(lbl_mode)
+        layout_modes_set = QHBoxLayout()
+        self.combo_modes.currentIndexChanged.connect(self.combo_modes_changed)
+        layout_modes_set.addWidget(self.combo_modes)
+        btn_modes_set_add = QPushButton("Добавить")
+        btn_modes_set_add.setMaximumWidth(80)
+        btn_modes_set_add.clicked.connect(self.btn_modes_set_add_click)
+        layout_modes_set.addWidget(btn_modes_set_add)
+        btn_modes_set_edt = QPushButton("Изменить")
+        btn_modes_set_edt.setMaximumWidth(80)
+        btn_modes_set_edt.clicked.connect(self.btn_modes_set_edt_click)
+        layout_modes_set.addWidget(btn_modes_set_edt)
+        btn_modes_set_del = QPushButton("Удалить")
+        btn_modes_set_del.setMaximumWidth(80)
+        btn_modes_set_del.clicked.connect(self.btn_modes_set_del_click)
+        layout_modes_set.addWidget(btn_modes_set_del)
+        layout_main.addLayout(layout_modes_set)
 
         layout_offset = QFormLayout()
         layout_offset.addRow(QLabel("Размер отступа слева"), self.edt_offset_left)
@@ -117,7 +123,21 @@ class SettingsDialog(QDialog):
         layout_offset.addRow(QLabel("Размер отступа сверху"), self.edt_offset_top)
         layout_offset.addRow(QLabel("Размер отступа снизу"), self.edt_offset_bottom)
 
+        self.edt_pixels_in_mm.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.edt_pixels_in_mm.setSingleStep(0)
+        self.edt_pixels_in_mm.setMinimum(1.000)
+        self.edt_pixels_in_mm.setMaximum(9999.999)
+        self.edt_pixels_in_mm.setValue(1.0)
+        self.edt_pixels_in_mm.setSingleStep(0.0)
+        self.edt_pixels_in_mm.setDecimals(3)
         layout_offset.addRow(QLabel("Пикселей на мм"), self.edt_pixels_in_mm)
+        self.edt_work_height.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.edt_work_height.setSingleStep(0)
+        self.edt_work_height.setMinimum(1.000)
+        self.edt_work_height.setMaximum(9999.999)
+        self.edt_work_height.setValue(1.0)
+        self.edt_work_height.setSingleStep(0.0)
+        self.edt_work_height.setDecimals(3)
         layout_offset.addRow(QLabel("Высота работы камеры, мм"), self.edt_work_height)
         layout_offset.addRow(QLabel("Фокус"), self.edt_focus)
         layout_offset.addRow(QLabel("Увеличение"), self.edt_zoom_ratio)
@@ -131,7 +151,7 @@ class SettingsDialog(QDialog):
     def combo_micros_changed(self):
         print(self.combo_micros.currentText())
 
-    def combo_set_micro_changed(self):
+    def combo_modes_changed(self):
         print(self.combo_set_micro.currentText())
 
     def btn_micros_add_click(self):
@@ -170,7 +190,7 @@ class SettingsDialog(QDialog):
             if ok and str.lower(text) == "удалить":
                 self.combo_micros.removeItem(self.combo_micros.currentIndex())
 
-    def btn_set_micro_add_click(self):
+    def btn_modes_set_add_click(self):
         input_dialog = QInputDialog()
         text, ok = input_dialog.getText(self, "Добавление настройки", "Наименование", QLineEdit.Normal)
 
@@ -178,7 +198,7 @@ class SettingsDialog(QDialog):
             self.combo_set_micro.addItem(text)
             self.combo_set_micro.setCurrentIndex(self.combo_set_micro.count() - 1)
 
-    def btn_set_micro_edt_click(self):
+    def btn_modes_set_edt_click(self):
         if self.combo_set_micro.count() == 0:
             return
         input_dialog = QInputDialog()
@@ -191,7 +211,7 @@ class SettingsDialog(QDialog):
             self.combo_set_micro.insertItem(i, text)
             self.combo_set_micro.setCurrentIndex(i)
 
-    def btn_set_micro_del_click(self):
+    def btn_modes_set_del_click(self):
         if self.combo_set_micro.count() == 0:
             return
         dlg_result = QMessageBox.question(self,

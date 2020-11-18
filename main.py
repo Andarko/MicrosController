@@ -41,7 +41,7 @@ class MainWindow(QMainWindow):
         self.micros_controller = MicrosController()
         self.table_controller = TableController(self.loop)
         # TEST Для удобства тестирования передаю в контроллер стола контроллер камеры
-        self.table_controller.test = False
+        self.table_controller.test = True
         # if self.table_controller.test:
         #     self.table_controller.micros_controller = self.micros_controller
         #     self.table_controller.program_settings = self.program_settings
@@ -67,11 +67,14 @@ class MainWindow(QMainWindow):
 
         self.program_settings = ProgramSettings()
 
+        self.table_controller.steps_in_mm = self.program_settings.steps_in_mm
+        self.table_controller.limits_step = self.program_settings.limits_step
+
         self.pixels_in_mm = self.program_settings.pixels_in_mm
-        self.snap_width_half = self.program_settings.snap_width_half
-        self.snap_height_half = self.program_settings.snap_height_half
-        self.snap_width = 2 * self.snap_width_half
-        self.snap_height = 2 * self.snap_height_half
+        self.snap_width = self.program_settings.snap_width
+        self.snap_height = self.program_settings.snap_height
+        self.snap_width_half = 0.5 * self.snap_width
+        self.snap_height_half = 0.5 * self.snap_height
         self.delta_x = int(self.snap_width_half * self.pixels_in_mm / 5)
         self.delta_y = int(self.snap_height_half * self.pixels_in_mm / 5)
         # Наличие несохраненного изображения
@@ -884,9 +887,10 @@ class TableController:
         self.manual_right_count = 0
         self.loop = loop
         self.thread_server = Thread(target=self.server_start)
-
-        self.steps_in_mm = 80
-        self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
+        self.steps_in_mm: int
+        self.limits_step: int
+        # self.steps_in_mm = 80
+        # self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
         # Режим тестирования - без работы с установкой
         self.test: bool
         # self.micros_controller: MicrosController = None
