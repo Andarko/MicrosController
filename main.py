@@ -67,16 +67,22 @@ class MainWindow(QMainWindow):
 
         self.program_settings = ProgramSettings()
 
-        self.table_controller.steps_in_mm = self.program_settings.steps_in_mm
-        self.table_controller.limits_step = self.program_settings.limits_step
+        # self.table_controller.steps_in_mm = self.program_settings.steps_in_mm
+        # self.table_controller.limits_step = self.program_settings.limits_step
+        # self.table_controller.limits_mm = self.program_settings.limits_mm
+        self.table_controller.steps_in_mm = self.program_settings.table_settings.steps_in_mm
+        self.table_controller.limits_step = self.program_settings.table_settings.limits_step
+        self.table_controller.limits_mm = self.program_settings.table_settings.limits_mm
 
-        self.pixels_in_mm = self.program_settings.pixels_in_mm
-        self.snap_width = self.program_settings.snap_width
-        self.snap_height = self.program_settings.snap_height
+        self.pixels_in_mm = self.program_settings.shot_settings.pixels_in_mm
+        self.snap_width = self.program_settings.shot_settings.snap_width
+        self.snap_height = self.program_settings.shot_settings.snap_height
         self.snap_width_half = 0.5 * self.snap_width
         self.snap_height_half = 0.5 * self.snap_height
         self.delta_x = int(self.snap_width_half * self.pixels_in_mm / 5)
         self.delta_y = int(self.snap_height_half * self.pixels_in_mm / 5)
+
+
         # Наличие несохраненного изображения
         self.unsaved = False
 
@@ -291,8 +297,8 @@ class MainWindow(QMainWindow):
 
     def device_move_mid(self):
         self.control_elements_enabled(False)
-        x = int(self.table_controller.limits_step[0] / self.table_controller.steps_in_mm / 2)
-        y = int(self.table_controller.limits_step[1] / self.table_controller.steps_in_mm / 2)
+        x = int(self.table_controller.limits_mm[0] / 2)
+        y = int(self.table_controller.limits_mm[1] / 2)
         self.coord_move([x, y, self.table_controller.coord_mm[2]])
         self.setWindowTitle(str(self.table_controller))
         self.control_elements_enabled(True)
@@ -349,8 +355,8 @@ class MainWindow(QMainWindow):
                 self.table_controller.coord_init()
             # Перевод камеры к позиции, где должна располагаться микросхема
 
-            x = int(self.table_controller.limits_step[0] / self.table_controller.steps_in_mm / 2)
-            y = int(self.table_controller.limits_step[1] / self.table_controller.steps_in_mm / 2)
+            x = int(self.table_controller.limits_mm[0] / 2)
+            y = int(self.table_controller.limits_mm[1] / 2)
             snap = self.coord_move([x, y, self.snap_height], mode="discrete")
 
             all_x = list()
@@ -888,7 +894,7 @@ class TableController:
         self.loop = loop
         self.thread_server = Thread(target=self.server_start)
         self.steps_in_mm: int
-        self.limits_step: int
+        self.limits_step: tuple
         # self.steps_in_mm = 80
         # self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
         # Режим тестирования - без работы с установкой
@@ -946,7 +952,7 @@ class TableController:
             self.result_unpack(result)
         else:
             self.coord_step = [self.limits_step[0], 0, 0]
-            self.coord_mm = [self.limits_step[0] / self.steps_in_mm, 0, 0]
+            self.coord_mm = [self.limits_mm[0], 0, 0]
             self.operation_status = 'init'
             self.server_status = 'init'
 

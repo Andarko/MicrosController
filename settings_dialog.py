@@ -4,27 +4,48 @@ from PyQt5.QtCore import Qt, QSize
 import xml.etree.ElementTree as Xml
 
 
+# Класс для хранения всех настроек камер. Он может загружаться из файла и сохраняться в файл
+class AllSettings(object):
+    def __init__(self):
+        # Список микроскопов и доступных разрешений
+        self.micros_settings = dict()
+
+
+# Классы для хранения текущих выбранных настроек
+# Выбранные настройки микроскопа
 class MicrosSettings(object):
     def __init__(self):
         self.name: str
         self.resolution: QSize
 
 
-class ShotSetting(object):
+# Выбранные настройки снимка (калибровка)
+class ShotSettings(object):
     def __init__(self):
         self.pixels_in_mm = 10.0
         self.snap_width = 20.0
         self.snap_height = 10.0
 
 
+# Текущие настройки стола
+class TableSettings(object):
+    def __init__(self):
+        self.steps_in_mm = 80
+        self.limits_mm = (340, 640, 70)
+        self.limits_step = 80 * self.limits_mm
+
+
+# Настройки программы, из которых
 class ProgramSettings(object):
     def __init__(self):
-        self.micros_settings: MicrosSettings()
-        self.pixels_in_mm = 10.0
-        self.snap_width = 20.0
-        self.snap_height = 10.0
-        self.steps_in_mm = 80
-        self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
+        self.micros_settings = MicrosSettings()
+        self.shot_settings = ShotSettings()
+        self.table_settings = TableSettings()
+        # self.pixels_in_mm = 10.0
+        # self.snap_width = 20.0
+        # self.snap_height = 10.0
+        # self.steps_in_mm = 80
+        # self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
 
 
 class SettingsDialog(QDialog):
