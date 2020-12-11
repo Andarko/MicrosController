@@ -71,8 +71,9 @@ class MainWindow(QMainWindow):
         # self.table_controller.limits_step = self.program_settings.limits_step
         # self.table_controller.limits_mm = self.program_settings.limits_mm
         self.table_controller.steps_in_mm = self.program_settings.table_settings.steps_in_mm
-        self.table_controller.limits_step = self.program_settings.table_settings.limits_step
+        # self.table_controller.limits_step = self.program_settings.table_settings.limits_step
         self.table_controller.limits_mm = self.program_settings.table_settings.limits_mm
+        self.table_controller.limits_step = self.table_controller.steps_in_mm * self.table_controller.limits_mm
 
         self.pixels_in_mm = self.program_settings.shot_settings.pixels_in_mm
         self.snap_width = self.program_settings.shot_settings.snap_width
