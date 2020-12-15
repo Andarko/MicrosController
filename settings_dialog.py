@@ -71,7 +71,7 @@ class SettingsDialog(QDialog):
         self.setMinimumWidth(480)
         layout_main = QVBoxLayout()
 
-        lbl_micros = QLabel("Выбранная камера")
+        lbl_micros = QLabel("Камера")
         # lbl_micros.setAlignment(Qt.AlignHCenter)
         font_title = lbl_micros.font()
         font_title.setBold(True)
