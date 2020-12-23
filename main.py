@@ -27,6 +27,9 @@ import json
 import math
 import xml.etree.ElementTree as Xml
 
+from imutils.video import VideoStream
+from imutils.video import FPS
+
 from settings_dialog import SettingsDialog, ProgramSettings
 
 
@@ -38,10 +41,10 @@ class MainWindow(QMainWindow):
 
         # self.micros_controller = TableController('localhost', 5001)
         self.loop = asyncio.get_event_loop()
-        self.micros_controller = MicrosController()
         self.table_controller = TableController(self.loop)
         # TEST Для удобства тестирования передаю в контроллер стола контроллер камеры
-        self.table_controller.test = True
+        self.table_controller.test = False
+        self.micros_controller = MicrosController(self.table_controller.test )
         # if self.table_controller.test:
         #     self.table_controller.micros_controller = self.micros_controller
         #     self.table_controller.program_settings = self.program_settings
@@ -65,7 +68,7 @@ class MainWindow(QMainWindow):
         self.dir_for_img = "SavedImg"
         self.path_for_xml_file = os.path.join(self.dir_for_img, "settings.xml")
 
-        self.program_settings = ProgramSettings()
+        self.program_settings = ProgramSettings(self.table_controller.test)
 
         # self.table_controller.steps_in_mm = self.program_settings.steps_in_mm
         # self.table_controller.limits_step = self.program_settings.limits_step
@@ -73,11 +76,13 @@ class MainWindow(QMainWindow):
         self.table_controller.steps_in_mm = self.program_settings.table_settings.steps_in_mm
         # self.table_controller.limits_step = self.program_settings.table_settings.limits_step
         self.table_controller.limits_mm = self.program_settings.table_settings.limits_mm
-        self.table_controller.limits_step = self.table_controller.steps_in_mm * self.table_controller.limits_mm
+        self.table_controller.limits_step = list()
+        for limit_mm in self.table_controller.limits_mm:
+            self.table_controller.limits_step.append(limit_mm * self.table_controller.steps_in_mm)
 
-        self.pixels_in_mm = self.program_settings.shot_settings.pixels_in_mm
-        self.snap_width = self.program_settings.shot_settings.snap_width
-        self.snap_height = self.program_settings.shot_settings.snap_height
+        self.pixels_in_mm = self.program_settings.snap_settings.pixels_in_mm
+        self.snap_width = self.program_settings.snap_settings.snap_width
+        self.snap_height = self.program_settings.snap_settings.snap_height
         self.snap_width_half = 0.5 * self.snap_width
         self.snap_height_half = 0.5 * self.snap_height
         self.delta_x = int(self.snap_width_half * self.pixels_in_mm / 5)
@@ -106,9 +111,6 @@ class MainWindow(QMainWindow):
         self.btn_save_scan = QPushButton("Сохранить съемку")
 
         self.init_ui()
-
-        # snap = self.micros_controller.snap(1500, 2500, 2500, 3500)
-        # self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
 
     # Создание элементов формы
     def init_ui(self):
@@ -468,7 +470,7 @@ class MainWindow(QMainWindow):
             for i in range(5, 0, -1):
                 x = middle + i * delta[0] * direction[0]
                 for y in range(img.shape[0]):
-                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                    if img[y][x][0] < 128 or img[y][x][1] < 128 or img[y][x][2] < 128:
                         return 'next' + str(i)
         else:
             middle = int(img.shape[0] / 2)
@@ -477,7 +479,7 @@ class MainWindow(QMainWindow):
             for i in range(5, 0, -1):
                 y = middle + i * delta[1] * direction[1]
                 for x in range(img.shape[1]):
-                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                    if img[y][x][0] < 128 or img[y][x][1] < 128 or img[y][x][2] < 128:
                         return 'next' + str(i)
 
         return 'stop'
@@ -495,7 +497,7 @@ class MainWindow(QMainWindow):
                 white = True
                 x = middle + i * delta[0] * direction[0]
                 for y in range(img.shape[0]):
-                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                    if img[y][x][0] < 128 or img[y][x][1] < 128 or img[y][x][2] < 128:
                         white = False
                         break
                 if white:
@@ -509,7 +511,7 @@ class MainWindow(QMainWindow):
             for i in range(5, 0, -1):
                 y = middle + i * delta[1] * direction[1]
                 for x in range(img.shape[1]):
-                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                    if img[y][x][0] < 128 or img[y][x][1] < 128 or img[y][x][2] < 128:
                         white = False
                         break
                 if white:
@@ -530,7 +532,7 @@ class MainWindow(QMainWindow):
                 white = True
                 x = middle + i * delta[0] * direction[0]
                 for y in range(img.shape[0]):
-                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                    if img[y][x][0] < 128 or img[y][x][1] < 128 or img[y][x][2] < 128:
                         white = False
                         break
                 if not white:
@@ -544,7 +546,7 @@ class MainWindow(QMainWindow):
                 white = True
                 y = middle + i * delta[1] * direction[1]
                 for x in range(img.shape[1]):
-                    if img[y][x][0] < 200 or img[y][x][1] < 200 or img[y][x][2] < 200:
+                    if img[y][x][0] < 128 or img[y][x][1] < 128 or img[y][x][2] < 128:
                         white = False
                         break
                 if not white:
@@ -770,13 +772,13 @@ class MainWindow(QMainWindow):
                     self.coord_move([0, steps_count, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_D].check_click():
-                    self.coord_move([-steps_count, 0, 0], mode="continuous")
+                    self.coord_move([steps_count, 0, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_S].check_click():
                     self.coord_move([0, -steps_count, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_A].check_click():
-                    self.coord_move([steps_count, 0, 0], mode="continuous")
+                    self.coord_move([-steps_count, 0, 0], mode="continuous")
                     # someone_clicked = True
                 if self.keyboard_buttons[Qt.Key_Plus].check_click():
                     self.coord_move([0, 0, steps_count], mode="continuous")
@@ -828,9 +830,29 @@ class KeyboardButton:
 
 # Класс управления микроскопом (пока тестовая подделка)
 class MicrosController:
-    def __init__(self):
+    def __init__(self, test: bool):
         self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard.jpg"
         self.test_img = cv2.imread(self.test_img_path)[:, :, ::-1]
+        self.test = test
+
+        if not self.test:
+            max_video_streams = 10
+            video_stream_index = -1
+            # vs = VideoStream(src=video_stream_index).start()
+            check_next_stream = True
+            while check_next_stream:
+                video_stream_index += 1
+                if video_stream_index > max_video_streams:
+                    video_stream_index = 0
+
+                self.video_stream = VideoStream(src=video_stream_index).start()
+                try:
+                    check_read = self.video_stream.read()
+                    check_frame = check_read[:, :, ::-1]
+                    check_next_stream = False
+                except:
+                    self.video_stream.stop()
+                    check_next_stream = True
 
     @staticmethod
     def numpy_to_q_image(image):
@@ -866,12 +888,15 @@ class MicrosController:
         return pixmap
 
     def snap(self, x1: int, y1: int, x2: int, y2: int):
-        time.sleep(0.1)
-        # return np.copy(self.test_img[y1:y2, x1:x2, :])
-        # Переворачиваем координаты съемки
-        y2_r = 6400 - y1
-        y1_r = 6400 - y2
-        return np.copy(self.test_img[y1_r:y2_r, x1:x2, :])
+        if self.test:
+            time.sleep(0.1)
+            # return np.copy(self.test_img[y1:y2, x1:x2, :])
+            # Переворачиваем координаты съемки
+            y2_r = 6400 - y1
+            y1_r = 6400 - y2
+            return np.copy(self.test_img[y1_r:y2_r, x1:x2, :])
+        else:
+            return np.copy(self.video_stream.read())
 
 
 # Класс, который общается с контроллером станка

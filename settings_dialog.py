@@ -5,6 +5,9 @@ import xml.etree.ElementTree as Xml
 
 
 # Класс для хранения всех настроек камер. Он может загружаться из файла и сохраняться в файл
+from lxml import etree
+
+
 class AllSettings(object):
     def __init__(self):
         # Список микроскопов и доступных разрешений
@@ -20,36 +23,93 @@ class MicrosSettings(object):
 
 
 # Выбранные настройки снимка (калибровка)
-class ShotSettings(object):
+class SnapSettings(object):
     def __init__(self):
         self.pixels_in_mm = 10.0
         self.snap_width = 20.0
         self.snap_height = 10.0
+        self.offset = [0, 0, 0, 0]
+        self.work_height = 50
 
 
 # Текущие настройки стола
 class TableSettings(object):
     def __init__(self):
         self.steps_in_mm = 80
-        self.limits_mm = (340, 640, 70)
+        self.limits_mm = [340, 640, 70]
         # self.limits_step = 80 * self.limits_mm
 
 
 # Настройки программы, из которых
 class ProgramSettings(object):
-    def __init__(self):
+    def __init__(self, test: bool):
         self.micros_settings = MicrosSettings()
-        self.shot_settings = ShotSettings()
+        self.snap_settings = SnapSettings()
         self.table_settings = TableSettings()
+        if not test:
+            self.load_current_from_xml("settings.xml")
         # self.pixels_in_mm = 10.0
         # self.snap_width = 20.0
         # self.snap_height = 10.0
         # self.steps_in_mm = 80
         # self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
 
+    def load_current_from_xml(self, file_name):
+        with open(file_name) as fileObj:
+            xml = fileObj.read()
+        root = etree.fromstring(xml)
+
+        for element_main in root.getchildren():
+            if element_main.tag == "Table":
+                for element_table in element_main.getchildren():
+                    if element_table.tag == "StepsInMM":
+                        self.table_settings.steps_in_mm = int(element_table.text)
+                    elif element_table.tag == "LimitsMM":
+                        for el_limit in element_table.getchildren():
+                            if el_limit.tag == "X":
+                                self.table_settings.limits_mm[0] = int(el_limit.text)
+                            elif el_limit.tag == "Y":
+                                self.table_settings.limits_mm[1] = int(el_limit.text)
+                            elif el_limit.tag == "Z":
+                                self.table_settings.limits_mm[2] = int(el_limit.text)
+
+            elif element_main.tag == "AllMicros":
+                for element_all in element_main.getchildren():
+                    if element_all.tag == "Micros":
+                        for element_micros in element_all.getchildren():
+                            if element_micros.tag == "Default" and element_micros.text == "True":
+                                for element_micros_2 in element_all.getchildren():
+                                    if element_micros_2.tag == "Resolution":
+                                        for element_resolution in element_micros_2.getchildren():
+                                            if element_resolution.tag == "Width":
+                                                self.snap_settings.snap_width = int(element_resolution.text)
+                                            elif element_resolution.tag == "Height":
+                                                self.snap_settings.snap_height = int(element_resolution.text)
+                                    if element_micros_2.tag == "Mode":
+                                        for element_mode in element_micros_2.getchildren():
+                                            if element_mode.tag == "Offset":
+                                                for element_offset in element_mode.getchildren():
+                                                    if element_offset.tag == "Left":
+                                                        self.snap_settings.offset[0] = int(element_offset.text)
+                                                    elif element_offset.tag == "Right":
+                                                        self.snap_settings.offset[1] = int(element_offset.text)
+                                                    elif element_offset.tag == "Top":
+                                                        self.snap_settings.offset[2] = int(element_offset.text)
+                                                    elif element_offset.tag == "Bottom":
+                                                        self.snap_settings.offset[3] = int(element_offset.text)
+                                            elif element_mode.tag == "PixelsInMM":
+                                                self.snap_settings.pixels_in_mm = float(element_mode.text)
+                                            elif element_mode.tag == "WorkHeightMM":
+                                                self.snap_settings.work_height = float(element_mode.text)
+                                            elif element_mode.tag == "Focus":
+                                                pass
+                                            elif element_mode.tag == "Zoom":
+                                                pass
+                                break
+
 
 class SettingsDialog(QDialog):
-    def __init__(self, program_settings: ProgramSettings()):
+    def __init__(self, program_settings: ProgramSettings):
         super().__init__()
         self.all_micros_settings = list()
         self.combo_micros = QComboBox()

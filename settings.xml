@@ -19,11 +19,11 @@
 					<Right>0</Right>
 					<Top>0</Top>
 					<Bottom>0</Bottom>
-					<PixelsInMM>800</PixelsInMM>
-					<WorkHeightMM>50</WorkHeightMM>
-					<Focus>Auto</Focus>
-					<Zoom>50x</Zoom>
 				</Offset>
+				<PixelsInMM>800</PixelsInMM>
+				<WorkHeightMM>50</WorkHeightMM>
+				<Focus>Auto</Focus>
+				<Zoom>50x</Zoom>
 			</Mode>
 		</Micros>
 		<Micros name = "Микроскоп_1 300к">
@@ -49,11 +49,29 @@
 					<Right>0</Right>
 					<Top>0</Top>
 					<Bottom>0</Bottom>
-					<PixelsInMM>10</PixelsInMM>
-					<WorkHeightMM>40</WorkHeightMM>
-					<Focus>Auto</Focus>
-					<Zoom>0.1x</Zoom>
 				</Offset>
+				<PixelsInMM>10</PixelsInMM>
+				<WorkHeightMM>40</WorkHeightMM>
+				<Focus>Auto</Focus>
+				<Zoom>0.1x</Zoom>
+			</Mode>
+		</Micros>
+		<Micros name = "Веб камера">
+			<Resolution>
+				<Width>640</Width>
+				<Height>480</Height>
+			</Resolution>
+			<Mode name = "Default">
+				<Offset>
+					<Left>200</Left>
+					<Right>200</Right>
+					<Top>150</Top>
+					<Bottom>150</Bottom>
+				</Offset>
+				<PixelsInMM>15.5</PixelsInMM>
+				<WorkHeightMM>10</WorkHeightMM>
+				<Focus>Auto</Focus>
+				<Zoom>1x</Zoom>
 			</Mode>
 			<Default>True</Default>
 		</Micros>
