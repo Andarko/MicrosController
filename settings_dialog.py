@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QDialog, QComboBox, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QInputDialog, \
     QLineEdit, QMessageBox, QFormLayout, QDoubleSpinBox, QSpinBox, QAbstractSpinBox
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QRect
 import xml.etree.ElementTree as Xml
 
 
@@ -26,9 +26,10 @@ class MicrosSettings(object):
 class SnapSettings(object):
     def __init__(self):
         self.pixels_in_mm = 10.0
-        self.snap_width = 20.0
-        self.snap_height = 10.0
+        self.snap_width = 200
+        self.snap_height = 100
         self.offset = [0, 0, 0, 0]
+        self.frame = [0, 0, 200, 100]
         self.work_height = 50
 
 
@@ -91,9 +92,9 @@ class ProgramSettings(object):
                                                 for element_offset in element_mode.getchildren():
                                                     if element_offset.tag == "Left":
                                                         self.snap_settings.offset[0] = int(element_offset.text)
-                                                    elif element_offset.tag == "Right":
-                                                        self.snap_settings.offset[1] = int(element_offset.text)
                                                     elif element_offset.tag == "Top":
+                                                        self.snap_settings.offset[1] = int(element_offset.text)
+                                                    elif element_offset.tag == "Right":
                                                         self.snap_settings.offset[2] = int(element_offset.text)
                                                     elif element_offset.tag == "Bottom":
                                                         self.snap_settings.offset[3] = int(element_offset.text)
@@ -106,6 +107,11 @@ class ProgramSettings(object):
                                             elif element_mode.tag == "Zoom":
                                                 pass
                                 break
+
+        self.snap_settings.frame[0] = self.snap_settings.offset[0]
+        self.snap_settings.frame[1] = self.snap_settings.offset[1]
+        self.snap_settings.frame[2] = self.snap_settings.snap_width - self.snap_settings.offset[2]
+        self.snap_settings.frame[3] = self.snap_settings.snap_height - self.snap_settings.offset[3]
 
 
 class SettingsDialog(QDialog):

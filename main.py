@@ -83,11 +83,14 @@ class MainWindow(QMainWindow):
         self.pixels_in_mm = self.program_settings.snap_settings.pixels_in_mm
         self.snap_width = self.program_settings.snap_settings.snap_width
         self.snap_height = self.program_settings.snap_settings.snap_height
-        self.snap_width_half = 0.5 * self.snap_width
-        self.snap_height_half = 0.5 * self.snap_height
-        self.delta_x = int(self.snap_width_half * self.pixels_in_mm / 5)
-        self.delta_y = int(self.snap_height_half * self.pixels_in_mm / 5)
+        self.snap_width_mm = self.snap_width / self.pixels_in_mm
+        self.snap_height_mm = self.snap_height / self.pixels_in_mm
+        self.snap_width_mm_half = 0.5 * self.snap_width_mm
+        self.snap_height_mm_half = 0.5 * self.snap_height_mm
 
+        self.micros_controller.frame = self.program_settings.snap_settings.frame
+        self.delta_x = int((self.micros_controller.frame[2] - self.micros_controller.frame[0]) / 10)
+        self.delta_y = int((self.micros_controller.frame[3] - self.micros_controller.frame[1]) / 10)
 
         # Наличие несохраненного изображения
         self.unsaved = False
@@ -238,13 +241,13 @@ class MainWindow(QMainWindow):
         self.table_controller.coord_move(coord, mode)
         if self.table_controller.test or mode != "continuous":
             snap = self.micros_controller.snap(int(self.pixels_in_mm * (self.table_controller.coord_mm[0]
-                                                                        - self.snap_width_half)),
+                                                                        - self.snap_width_mm_half)),
                                                int(self.pixels_in_mm * (self.table_controller.coord_mm[1]
-                                                                        - self.snap_height_half)),
+                                                                        - self.snap_height_mm_half)),
                                                int(self.pixels_in_mm * (self.table_controller.coord_mm[0]
-                                                                        + self.snap_width_half)),
+                                                                        + self.snap_width_mm_half)),
                                                int(self.pixels_in_mm * (self.table_controller.coord_mm[1]
-                                                                        + self.snap_height_half)))
+                                                                        + self.snap_height_mm_half)))
             self.lbl_img.setPixmap(self.micros_controller.numpy_to_pixmap(snap))
             self.lbl_img.repaint()
             self.setWindowTitle(str(self.table_controller))
@@ -360,7 +363,7 @@ class MainWindow(QMainWindow):
 
             x = int(self.table_controller.limits_mm[0] / 2)
             y = int(self.table_controller.limits_mm[1] / 2)
-            snap = self.coord_move([x, y, self.snap_height], mode="discrete")
+            snap = self.coord_move([x, y, self.snap_height_mm], mode="discrete")
 
             all_x = list()
             all_y = list()
@@ -388,11 +391,28 @@ class MainWindow(QMainWindow):
                         steps_count = self.check_object_inside(snap, previous_direction, [self.delta_x, self.delta_y])
                         # Проверяем - не ушли ли мы вовнутрь объекта
                         while steps_count > 0:
-                            x += int(self.delta_x * steps_count * previous_direction[0] / self.pixels_in_mm)
-                            y -= int(self.delta_y * steps_count * previous_direction[1] / self.pixels_in_mm)
+                            # Проверяем - не вышли ли мы за пределы стола
+                            check_limit = True
+                            limit_break = False
+                            while check_limit:
+                                check_limit = False
+                                x += int(self.delta_x * steps_count * previous_direction[0] / self.pixels_in_mm)
+                                y -= int(self.delta_y * steps_count * previous_direction[1] / self.pixels_in_mm)
+                                if x < 0 or y < 0 or x > self.table_controller.limits_mm[0] or y > self.table_controller.limits_mm[1]:
+                                    x = all_x[-1]
+                                    y = all_y[-1]
+                                    if steps_count > 1:
+                                        steps_count -= 1
+                                        check_limit = True
+                                    else:
+                                        check_limit = False
+                                        limit_break = True
+                            if limit_break:
+                                break
+
                             all_x.append(x)
                             all_y.append(y)
-                            snap = self.coord_move([x, y, self.snap_height], mode="discrete")
+                            snap = self.coord_move([x, y, self.snap_height_mm], mode="discrete")
                             # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                             #                                    self.pixels_in_mm * (y - self.snap_height_half),
                             #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -413,11 +433,29 @@ class MainWindow(QMainWindow):
                                                                 [self.delta_x, self.delta_y])
                         # Проверяем - не ушли ли мы наружу объекта
                         while steps_count > 0:
-                            x += int(self.delta_x * steps_count * previous_opposite_direction[0] / self.pixels_in_mm)
-                            y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
+                            # Проверяем - не вышли ли мы за пределы стола
+                            check_limit = True
+                            limit_break = False
+                            while check_limit:
+                                check_limit = False
+                                x += int(self.delta_x * steps_count * previous_opposite_direction[0] / self.pixels_in_mm)
+                                y -= int(self.delta_y * steps_count * previous_opposite_direction[1] / self.pixels_in_mm)
+                                if x < 0 or y < 0 or x > self.table_controller.limits_mm[0] or y > \
+                                        self.table_controller.limits_mm[1]:
+                                    x = all_x[-1]
+                                    y = all_y[-1]
+                                    if steps_count > 1:
+                                        steps_count -= 1
+                                        check_limit = True
+                                    else:
+                                        check_limit = False
+                                        limit_break = True
+                            if limit_break:
+                                break
+
                             all_x.append(x)
                             all_y.append(y)
-                            snap = self.coord_move([x, y, self.snap_height], mode="discrete")
+                            snap = self.coord_move([x, y, self.snap_height_mm], mode="discrete")
                             # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                             #                                    self.pixels_in_mm * (y - self.snap_height_half),
                             #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -435,11 +473,28 @@ class MainWindow(QMainWindow):
                     # Можно идти в направлении поиска границы еще
                     if check_border_result.startswith('next'):
                         steps_count = int(check_border_result[4])
-                        x += int(self.delta_x * direction[0] * steps_count / self.pixels_in_mm)
-                        y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
+                        # Проверяем - не вышли ли мы за пределы стола
+                        check_limit = True
+                        limit_break = False
+                        while check_limit:
+                            check_limit = False
+                            x += int(self.delta_x * direction[0] * steps_count / self.pixels_in_mm)
+                            y -= int(self.delta_y * direction[1] * steps_count / self.pixels_in_mm)
+                            if x < 0 or y < 0 or x > self.table_controller.limits_mm[0] or y > \
+                                    self.table_controller.limits_mm[1]:
+                                x = all_x[-1]
+                                y = all_y[-1]
+                                if steps_count > 1:
+                                    steps_count -= 1
+                                    check_limit = True
+                                else:
+                                    check_limit = False
+                                    limit_break = True
+                        if limit_break:
+                            break
                         all_x.append(x)
                         all_y.append(y)
-                        snap = self.coord_move([x, y, self.snap_height], mode="discrete")
+                        snap = self.coord_move([x, y, self.snap_height_mm], mode="discrete")
                         # snap = self.micros_controller.snap(self.pixels_in_mm * (x - self.snap_width_half),
                         #                                    self.pixels_in_mm * (y - self.snap_height_half),
                         #                                    self.pixels_in_mm * (x + self.snap_width_half),
@@ -579,20 +634,20 @@ class MainWindow(QMainWindow):
 
         # Определяем на сколько мм выступает все поле съемки из целого числа кадров
         # x_overage = x2 - x1 - self.snap_width * int((x2 - x1) / self.snap_width)
-        x_overage = (x2 - x1) % self.snap_width
-        x_count = int((x2 - x1) // self.snap_width) + 1
+        x_overage = (x2 - x1) % self.snap_width_mm
+        x_count = int((x2 - x1) // self.snap_width_mm) + 1
         if x_overage > 0:
             # А это - сколько надо добавить к полю съемки, чтобы получилось целое число кадров
-            x_deficit = self.snap_width - x_overage
+            x_deficit = self.snap_width_mm - x_overage
             x_count += 1
             x2 += x_deficit / 2
             x1 -= x_deficit / 2
 
         # y_overage = y2 - y1 - self.snap_height * int((y2 - y1) / self.snap_height)
-        y_overage = (y2 - y1) % self.snap_height
-        y_count = int((y2 - y1) // self.snap_height + 1)
+        y_overage = (y2 - y1) % self.snap_height_mm
+        y_count = int((y2 - y1) // self.snap_height_mm + 1)
         if y_overage > 0:
-            y_deficit = self.snap_height - y_overage
+            y_deficit = self.snap_height_mm - y_overage
             y_count += 1
             y2 += y_deficit / 2
             y1 -= y_deficit / 2
@@ -616,7 +671,7 @@ class MainWindow(QMainWindow):
             j_delta = -1
 
         for j in range(j_start, j_finish, j_delta):
-            y = y1 + j * self.snap_height
+            y = y1 + j * self.snap_height_mm
             # В проге просмотра ось y вернута вниз
             j_r = y_count - 1 - j
             if left_dir:
@@ -624,8 +679,8 @@ class MainWindow(QMainWindow):
             else:
                 x_range = range(0, x_count, 1)
             for i in x_range:
-                x = x1 + i * self.snap_width
-                snap = self.coord_move([x, y, self.snap_height], mode="discrete")
+                x = x1 + i * self.snap_width_mm
+                snap = self.coord_move([x, y, self.snap_height_mm], mode="discrete")
                 cv2.imwrite(os.path.join(self.dir_for_img, "S_{0}_{1}.jpg".format(j_r + 1, i + 1)), snap[:, :, ::-1])
                 print('x = ' + str(x) + '; y = ' + str(y))
 
@@ -677,10 +732,10 @@ class MainWindow(QMainWindow):
         # Создание файла описания XML
         root = Xml.Element("Root")
         elem_rc = Xml.Element("RowCount")
-        elem_rc.text = str(int((y2 - y1) / self.snap_height) + 1)
+        elem_rc.text = str(int((y2 - y1) / self.snap_height_mm) + 1)
         root.append(elem_rc)
         elem_cc = Xml.Element("ColCount")
-        elem_cc.text = str(int((x2 - x1) / self.snap_width) + 1)
+        elem_cc.text = str(int((x2 - x1) / self.snap_width_mm) + 1)
         root.append(elem_cc)
         elem_img = Xml.Element("Image")
         root.append(elem_img)
@@ -688,18 +743,18 @@ class MainWindow(QMainWindow):
         img_format.text = "jpg"
         img_size = Xml.SubElement(elem_img, "ImgSize")
         img_size_width = Xml.SubElement(img_size, "Width")
-        img_size_width.text = str(int(self.snap_width * self.pixels_in_mm))
+        img_size_width.text = str(int(self.snap_width_mm * self.pixels_in_mm))
         img_size_height = Xml.SubElement(img_size, "Height")
-        img_size_height.text = str(int(self.snap_height * self.pixels_in_mm))
+        img_size_height.text = str(int(self.snap_height_mm * self.pixels_in_mm))
         img_con_area = Xml.SubElement(elem_img, "ConnectionArea")
         ica_x = Xml.SubElement(img_con_area, "X")
         ica_x.text = str(0)
         ica_y = Xml.SubElement(img_con_area, "Y")
         ica_y.text = str(0)
         ica_width = Xml.SubElement(img_con_area, "Width")
-        ica_width.text = str(int(self.snap_width * self.pixels_in_mm))
+        ica_width.text = str(int(self.snap_width_mm * self.pixels_in_mm))
         ica_height = Xml.SubElement(img_con_area, "Height")
-        ica_height.text = str(int(self.snap_height * self.pixels_in_mm))
+        ica_height.text = str(int(self.snap_height_mm * self.pixels_in_mm))
 
         tree = Xml.ElementTree(root)
         with open(self.path_for_xml_file, "w"):
@@ -834,6 +889,7 @@ class MicrosController:
         self.test_img_path = "/home/andrey/Projects/MicrosController/TEST/MotherBoard.jpg"
         self.test_img = cv2.imread(self.test_img_path)[:, :, ::-1]
         self.test = test
+        self.frame = list()
 
         if not self.test:
             max_video_streams = 10
@@ -896,7 +952,7 @@ class MicrosController:
             y1_r = 6400 - y2
             return np.copy(self.test_img[y1_r:y2_r, x1:x2, :])
         else:
-            return np.copy(self.video_stream.read())
+            return np.copy(self.video_stream.read()[self.frame[1]:self.frame[3], self.frame[0]:self.frame[2], :])
 
 
 # Класс, который общается с контроллером станка
@@ -919,8 +975,9 @@ class TableController:
         self.manual_right_count = 0
         self.loop = loop
         self.thread_server = Thread(target=self.server_start)
-        self.steps_in_mm: int
-        self.limits_step: tuple
+        self.steps_in_mm = 80
+        self.limits_step = []
+        self.limits_mm = []
         # self.steps_in_mm = 80
         # self.limits_step = (340 * self.steps_in_mm, 640 * self.steps_in_mm, 70 * self.steps_in_mm)
         # Режим тестирования - без работы с установкой
